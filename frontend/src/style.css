@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { @apply h-full; }
+  body { @apply h-full bg-base-100 text-base-content; }
+  #app { @apply h-full; }
+}
+
+@layer components {
+  .stat-up { @apply text-profit font-semibold; }
+  .stat-down { @apply text-loss font-semibold; }
+  .badge-bullish { @apply badge badge-success badge-sm; }
+  .badge-bearish { @apply badge badge-error badge-sm; }
+}
