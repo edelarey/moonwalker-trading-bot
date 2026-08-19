@@ -139,8 +139,12 @@ function signalBadgeClass(signal: string): string {
     <div class="card bg-base-200 border border-base-300">
       <div class="card-body p-4">
         <h2 class="card-title text-base">⚡ Live Reversal Signals</h2>
+        <p class="text-xs text-base-content/50 mb-2">
+          Still live: Break &amp; Bounce engine broadcasts reversals here over the websocket.
+          Signals show even when Auto is off. Fills only if the Break &amp; Bounce row below has Auto on.
+        </p>
         <div v-if="!reversals.length" class="text-center text-base-content/40 py-8 text-sm">
-          Waiting for reversal signals…
+          Waiting for Break &amp; Bounce reversal signals (breakout → retest → reversal candle in the strategy’s window)…
         </div>
         <div v-else class="space-y-2">
           <div

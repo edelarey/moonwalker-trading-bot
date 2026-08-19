@@ -80,8 +80,17 @@ function normalizeIntervalFields(p: Record<string, any>): Record<string, any> {
   for (const key of ['timeframe', 'breakoutTimeframe', 'entryTimeframe', 'primaryTimeframe']) {
     if (next[key] != null) next[key] = canonTf(next[key])
   }
+  if (next.stopFillMode !== 'stop_price' && next.stopFillMode !== 'bar_close') {
+    next.stopFillMode = ''
+  }
   return next
 }
+
+const accountStopFillLabel = computed(() =>
+  (configStore.config?.stopFillMode ?? 'bar_close') === 'stop_price'
+    ? 'fill at stop price'
+    : 'fill at candle close',
+)
 
 function openCreate() {
   editingId.value = null
@@ -457,7 +466,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
               <label class="form-control">
                 <span class="label-text text-xs">Stop fill (backtest)</span>
                 <select v-model="formParams.stopFillMode" class="select select-bordered select-sm w-full h-10 min-h-10 leading-10 py-0">
-                  <option value="">Account default</option>
+                  <option value="">Account default ({{ accountStopFillLabel }})</option>
                   <option value="stop_price">Fill at stop price</option>
                   <option value="bar_close">Fill at candle close</option>
                 </select>
