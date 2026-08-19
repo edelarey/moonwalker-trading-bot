@@ -160,7 +160,7 @@ function calcSummary(trades: Trade[], startEquity: number, endEquity: number): i
   for (const t of trades) { eq += t.pnl ?? 0; if (eq > peak) peak = eq; const dd = peak - eq; if (dd > maxDD) maxDD = dd; }
   return { totalTrades: trades.length, winningTrades: winners.length, losingTrades: losers.length,
     winRate: trades.length > 0 ? winners.length / trades.length : 0,
-    profitFactor: gl > 0 ? gp / gl : gp > 0 ? Infinity : 0, totalPnl: endEquity - startEquity,
+    profitFactor: gl > 0 ? gp / gl : gp > 0 ? null : 0, totalPnl: endEquity - startEquity,
     maxDrawdown: maxDD, maxDrawdownPercent: (maxDD / startEquity) * 100,
     avgRR: 0, startingEquity: startEquity, endingEquity: endEquity };
 }

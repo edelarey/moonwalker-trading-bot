@@ -268,7 +268,11 @@ router.delete('/backtest/results', (_req: Request, res: Response) => {
 });
 
 router.delete('/backtest/results/:id', (req: Request, res: Response) => {
-  const ok = store.deleteBacktestResult(req.params.id);
+  const id = String(req.params.id || '').trim();
+  if (!id || id === 'undefined' || id === 'null') {
+    return res.status(400).json({ error: 'Missing backtest id' }) as any;
+  }
+  const ok = store.deleteBacktestResult(id);
   if (!ok) return res.status(404).json({ error: 'Not found' }) as any;
   res.json({ ok: true });
 });

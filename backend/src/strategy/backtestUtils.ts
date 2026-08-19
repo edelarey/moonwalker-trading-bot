@@ -27,7 +27,7 @@ export function calcSummary(trades: Trade[], startEquity: number, endEquity: num
     winningTrades: winners.length,
     losingTrades: losers.length,
     winRate: trades.length > 0 ? winners.length / trades.length : 0,
-    profitFactor: gl > 0 ? gp / gl : gp > 0 ? Infinity : 0,
+    profitFactor: gl > 0 ? gp / gl : gp > 0 ? null : 0,
     totalPnl: endEquity - startEquity,
     maxDrawdown: maxDD,
     maxDrawdownPercent: startEquity > 0 ? (maxDD / startEquity) * 100 : 0,

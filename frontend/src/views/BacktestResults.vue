@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { useBacktestStore } from '@/stores/backtest'
 import StatCard from '@/components/StatCard.vue'
 import TradeRow from '@/components/TradeRow.vue'
@@ -7,14 +7,55 @@ import EquityCurve from '@/components/EquityCurve.vue'
 import { backtestApi } from '@/api/client'
 
 const store = useBacktestStore()
+const busy = ref(false)
+const actionError = ref<string | null>(null)
 
 onMounted(() => store.fetchResults())
 
+const hasResults = computed(() => store.results.length > 0)
 const result = computed(() => store.currentResult)
 const s = computed(() => result.value?.summary)
 
 function selectResult(id: string) {
   store.currentResult = store.results.find(r => r.id === id) ?? null
+}
+
+async function deleteThis() {
+  if (!result.value?.id) return
+  if (!confirm('Delete this backtest run?')) return
+  busy.value = true
+  actionError.value = null
+  try {
+    await store.removeOne(result.value.id)
+  } catch (e: any) {
+    actionError.value = e?.message ?? 'Delete failed'
+    await store.fetchResults()
+  } finally {
+    busy.value = false
+  }
+}
+
+async function deleteAll() {
+  if (!confirm('Clear all saved backtests? This cannot be undone.')) return
+  busy.value = true
+  actionError.value = null
+  try {
+    await store.clearAll()
+  } catch (e: any) {
+    actionError.value = e?.message ?? 'Clear all failed'
+    await store.fetchResults()
+  } finally {
+    busy.value = false
+  }
+}
+
+function label(r: { instanceName?: string; strategyType?: string }) {
+  return r.instanceName || r.strategyType || 'Backtest'
+}
+
+function fmtNum(n: number | null | undefined, digits = 2, fallback = '—'): string {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return fallback
+  return n.toFixed(digits)
 }
 </script>
 
@@ -23,32 +64,34 @@ function selectResult(id: string) {
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div>
         <h1 class="text-2xl font-bold">Backtest Results</h1>
-        <p v-if="result" class="text-sm text-base-content/60 mt-0.5">
-          {{ result.instanceName || 'Break & Bounce' }}
-          · {{ result.params.symbols.join(', ') }}
+        <p v-if="hasResults && result" class="text-sm text-base-content/60 mt-0.5">
+          {{ label(result) }}
+          · {{ result.params?.symbols?.join(', ') }}
           · {{ result.params.startDate }} → {{ result.params.endDate }}
-          · PnL is profit vs $ {{ result.summary.startingEquity.toFixed(0) }} start, not the closing balance
+          · PnL is profit vs $ {{ fmtNum(result.summary.startingEquity, 0, '10,000') }} start, not the closing balance
         </p>
       </div>
       <div class="flex gap-2">
-        <button v-if="result" class="btn btn-sm btn-outline" @click="backtestApi.exportCsv(result!.id)">
+        <button v-if="hasResults && result" class="btn btn-sm btn-outline" :disabled="busy" @click="backtestApi.exportCsv(result!.id)">
           Export CSV
         </button>
-        <button v-if="result" class="btn btn-sm btn-outline btn-error" @click="store.removeOne(result!.id)">
+        <button v-if="hasResults && result" class="btn btn-sm btn-outline btn-error" :disabled="busy" @click="deleteThis">
           Delete this run
         </button>
         <button
-          v-if="store.results.length"
+          v-if="hasResults"
           class="btn btn-sm btn-error"
-          @click="confirm('Clear all saved backtests? This cannot be undone.') && store.clearAll()"
+          :disabled="busy"
+          @click="deleteAll"
         >
-          Clear all backtests
+          {{ busy ? 'Working…' : 'Delete all backtests' }}
         </button>
       </div>
     </div>
 
-    <!-- Result Selector -->
-    <div v-if="store.results.length > 1" class="flex flex-wrap gap-2">
+    <p v-if="actionError" class="text-error text-sm">{{ actionError }}</p>
+
+    <div v-if="hasResults" class="flex flex-wrap gap-2">
       <button
         v-for="r in store.results"
         :key="r.id"
@@ -56,36 +99,33 @@ function selectResult(id: string) {
         :class="result?.id === r.id ? 'btn-primary' : 'btn-outline'"
         @click="selectResult(r.id)"
       >
-        {{ new Date(r.runAt).toLocaleDateString() }} — {{ r.instanceName || 'B&B' }} — {{ r.params.symbols.slice(0, 3).join(',') }}
+        {{ new Date(r.runAt).toLocaleDateString() }} — {{ label(r) }} — {{ (r.params?.symbols ?? []).slice(0, 3).join(',') }}
       </button>
     </div>
 
-    <div v-if="!result" class="text-center text-base-content/40 py-20 text-lg">
+    <div v-if="!hasResults" class="text-center text-base-content/40 py-20 text-lg">
       No saved backtests yet. Run one from Backtest or Strategy Manager — results are stored on disk and survive a refresh.
     </div>
 
-    <template v-else>
-      <!-- Summary Cards -->
+    <template v-else-if="result">
       <div v-if="s" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Trades" :value="s.totalTrades" icon="🔢" />
-        <StatCard title="Win Rate" :value="(s.winRate * 100).toFixed(1) + '%'" :trend="s.winRate >= 0.5 ? 'up' : 'down'" icon="🎯" />
-        <StatCard title="Profit Factor" :value="isFinite(s.profitFactor) ? s.profitFactor.toFixed(2) : '∞'" :trend="s.profitFactor >= 1.5 ? 'up' : 'down'" icon="⚖️" />
-        <StatCard title="Total P&L" :value="(s.totalPnl >= 0 ? '+' : '') + s.totalPnl.toFixed(2) + ' USDT'" :trend="s.totalPnl >= 0 ? 'up' : 'down'" icon="💰" />
-        <StatCard title="Max Drawdown" :value="s.maxDrawdown.toFixed(2) + ' USDT'" :trend="s.maxDrawdownPercent < 10 ? 'up' : 'down'" icon="📉" />
-        <StatCard title="Max DD %" :value="s.maxDrawdownPercent.toFixed(2) + '%'" icon="📊" />
-        <StatCard title="Avg R:R" :value="s.avgRR.toFixed(2)" icon="📐" />
-        <StatCard title="End Equity" :value="'$' + s.endingEquity.toFixed(2)" icon="💵" />
+        <StatCard title="Win Rate" :value="fmtNum(s.winRate != null ? s.winRate * 100 : null, 1) + '%'" :trend="(s.winRate ?? 0) >= 0.5 ? 'up' : 'down'" icon="🎯" />
+        <StatCard title="Profit Factor" :value="s.profitFactor == null || !Number.isFinite(s.profitFactor) ? '∞' : fmtNum(s.profitFactor)" :trend="(s.profitFactor ?? 0) >= 1.5 ? 'up' : 'down'" icon="⚖️" />
+        <StatCard title="Total P&L" :value="((s.totalPnl ?? 0) >= 0 ? '+' : '') + fmtNum(s.totalPnl) + ' USDT'" :trend="(s.totalPnl ?? 0) >= 0 ? 'up' : 'down'" icon="💰" />
+        <StatCard title="Max Drawdown" :value="fmtNum(s.maxDrawdown) + ' USDT'" :trend="(s.maxDrawdownPercent ?? 0) < 10 ? 'up' : 'down'" icon="📉" />
+        <StatCard title="Max DD %" :value="fmtNum(s.maxDrawdownPercent) + '%'" icon="📊" />
+        <StatCard title="Avg R:R" :value="fmtNum(s.avgRR)" icon="📐" />
+        <StatCard title="End Equity" :value="'$' + fmtNum(s.endingEquity)" icon="💵" />
       </div>
 
-      <!-- Equity Curve -->
       <div class="card bg-base-200 border border-base-300">
         <div class="card-body p-4">
           <h2 class="card-title text-base">Equity Curve</h2>
-          <EquityCurve :trades="result.trades" :starting-equity="s?.startingEquity" />
+          <EquityCurve :key="result.id" :trades="result.trades" :starting-equity="s?.startingEquity" />
         </div>
       </div>
 
-      <!-- Trade List -->
       <div class="card bg-base-200 border border-base-300">
         <div class="card-body p-4">
           <h2 class="card-title text-base">Trade List ({{ result.trades.length }})</h2>

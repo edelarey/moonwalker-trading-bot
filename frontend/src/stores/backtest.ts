@@ -24,11 +24,20 @@ export const useBacktestStore = defineStore('backtest', () => {
     }
   }
 
+  function syncCurrent(): void {
+    const still = results.value.find(r => r.id && r.id === currentResult.value?.id)
+    currentResult.value = still ?? results.value[0] ?? null
+  }
+
   async function fetchResults() {
-    results.value = await backtestApi.results()
-    if (results.value.length && !currentResult.value) {
-      currentResult.value = results.value[0]
+    try {
+      const list = await backtestApi.results()
+      results.value = Array.isArray(list) ? list : []
+    } catch (e: any) {
+      error.value = e?.message ?? 'Failed to load backtests'
+      results.value = []
     }
+    syncCurrent()
   }
 
   async function clearAll() {
@@ -40,10 +49,12 @@ export const useBacktestStore = defineStore('backtest', () => {
   async function removeOne(id: string) {
     await backtestApi.remove(id)
     results.value = results.value.filter(r => r.id !== id)
-    if (currentResult.value?.id === id) {
-      currentResult.value = results.value[0] ?? null
-    }
+    syncCurrent()
   }
 
-  return { results, currentResult, running, error, runBacktest, fetchResults, clearAll, removeOne }
+  function selectLatest(): void {
+    currentResult.value = results.value[0] ?? null
+  }
+
+  return { results, currentResult, running, error, runBacktest, fetchResults, clearAll, removeOne, selectLatest }
 })

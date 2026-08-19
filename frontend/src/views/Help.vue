@@ -151,8 +151,7 @@ const faqs = [
         <ol class="list-decimal list-inside space-y-1">
           <li>Leave Trading Mode on <strong>Paper</strong> in Settings (default).</li>
           <li>In Strategy Manager, pick one strategy and one liquid symbol (BTCUSDT).</li>
-          <li>Click <strong>Deploy paper</strong> — that enables the strategy and Auto-execute.</li>
-          <li>For Break &amp; Bounce, also turn AUTO on in Trading.</li>
+          <li>Click <strong>Deploy paper</strong> — that enables the strategy and Auto (same for Break &amp; Bounce).</li>
           <li>Watch Positions: a signal should open a paper fill, then SL/TP close it on later candles.</li>
           <li>Compare with a historical backtest on the same params before considering Live.</li>
         </ol>
@@ -193,12 +192,12 @@ const faqs = [
       <div class="px-5 pb-5 pt-3 border-t border-base-300 space-y-3">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="p-4 rounded-lg bg-base-300 space-y-2">
-            <p class="font-semibold text-sm">🔵 AUTO Mode OFF (default)</p>
-            <p class="text-xs text-base-content/70">The bot detects signals and shows them in the <strong>Live Reversal Signals</strong> feed, but does NOT open trades automatically. You review each signal and decide manually. This is the safe default.</p>
+            <p class="font-semibold text-sm">🔵 Auto OFF (default)</p>
+            <p class="text-xs text-base-content/70">Each strategy in <strong>Trading</strong> / Strategy Manager has its own Auto toggle (including Break &amp; Bounce). Off = signals still show in the feed, no fills.</p>
           </div>
           <div class="p-4 rounded-lg bg-base-300 space-y-2">
-            <p class="font-semibold text-sm text-warning">⚡ AUTO Mode ON</p>
-            <p class="text-xs text-base-content/70">The bot opens trades automatically on every reversal signal, using the configured risk parameters. <strong class="text-warning">Only enable on testnet until you have verified the strategy performance with backtesting.</strong></p>
+            <p class="font-semibold text-sm text-warning">⚡ Auto ON</p>
+            <p class="text-xs text-base-content/70">That strategy opens trades on its signals in the current Paper/Live mode. <strong class="text-warning">Keep Paper until a strategy looks stable in backtests and paper fills.</strong></p>
           </div>
         </div>
         <div class="p-4 rounded-lg bg-base-300 space-y-2">
@@ -218,7 +217,7 @@ const faqs = [
       <div class="px-5 pb-5 pt-3 border-t border-base-300 space-y-4">
         <ol class="list-decimal list-inside space-y-1 text-sm text-base-content/80">
           <li>Go to <strong>Backtest</strong> in the sidebar</li>
-          <li>Pick <strong>Strategy Instance</strong> (uses saved params) or <strong>Break &amp; Bounce (Global)</strong></li>
+          <li>Pick a strategy (Break &amp; Bounce is in the same list as the others). Params come from Strategy Manager</li>
           <li>Select a date range. Risk % is how much equity one exact stop costs (default 1%)</li>
           <li>Only <strong>BTCUSDT</strong> is selected by default. Your last coins, dates, and risk are remembered in the browser</li>
           <li>Strategy params are read-only here — edit them in Strategy Manager</li>

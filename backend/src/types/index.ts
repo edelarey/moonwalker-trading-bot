@@ -181,7 +181,7 @@ export interface BacktestSummary {
   winningTrades: number;
   losingTrades: number;
   winRate: number;       // 0-1
-  profitFactor: number;
+  profitFactor: number | null;
   totalPnl: number;
   maxDrawdown: number;
   maxDrawdownPercent: number;

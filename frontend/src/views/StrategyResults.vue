@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue'
 import { useStrategiesStore, type StrategyType } from '@/stores/strategies'
+import { useBacktestStore } from '@/stores/backtest'
 import { backtestApi, type BacktestResult } from '@/api/client'
 import { ref } from 'vue'
 
 const store = useStrategiesStore()
+const backtests = useBacktestStore()
 const rows = ref<BacktestResult[]>([])
 const loading = ref(false)
 const clearing = ref(false)
@@ -53,7 +55,7 @@ async function clearAll() {
   if (!confirm('Clear all saved backtests? This cannot be undone.')) return
   clearing.value = true
   try {
-    await backtestApi.clear()
+    await backtests.clearAll()
     rows.value = []
     store.clearBacktestResults()
   } finally {
@@ -63,8 +65,22 @@ async function clearAll() {
 
 async function removeOne(id: string) {
   if (!confirm('Delete this backtest run?')) return
-  await backtestApi.remove(id)
+  await backtests.removeOne(id)
   rows.value = rows.value.filter(r => r.id !== id)
+  store.clearBacktestResults()
+  for (const r of rows.value) {
+    store.addBacktestResult(
+      r.instanceId ?? r.id,
+      r.instanceName ?? r.strategyType ?? 'Backtest',
+      (r.strategyType ?? 'break_bounce') as StrategyType,
+      {
+        totalTrades: r.summary.totalTrades,
+        winRate: r.summary.winRate,
+        totalPnl: r.summary.totalPnl,
+        maxDrawdown: r.summary.maxDrawdown,
+      },
+    )
+  }
 }
 
 const display = computed(() =>

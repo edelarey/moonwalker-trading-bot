@@ -290,7 +290,7 @@ function calcSummary(trades: Trade[], startEquity: number, endEquity: number): B
     winningTrades: winners.length,
     losingTrades: losers.length,
     winRate: trades.length > 0 ? winners.length / trades.length : 0,
-    profitFactor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0,
+    profitFactor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? null : 0,
     totalPnl: endEquity - startEquity,
     maxDrawdown: maxDD,
     maxDrawdownPercent: (maxDD / startEquity) * 100,

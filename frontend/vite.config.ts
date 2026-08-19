@@ -16,6 +16,9 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:3001',
         changeOrigin: true,
+        configure(proxy) {
+          proxy.on('error', () => { /* backend not up yet or restarting */ })
+        },
       },
       '/ws': {
         target: 'ws://127.0.0.1:3001',

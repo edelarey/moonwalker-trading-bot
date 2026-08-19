@@ -2,10 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useTradesStore } from '@/stores/trades'
-import { keysApi, backtestApi, type ApiKeyStatus } from '@/api/client'
+import { keysApi, type ApiKeyStatus } from '@/api/client'
+import { useBacktestStore } from '@/stores/backtest'
 
 const config = useConfigStore()
 const trades = useTradesStore()
+const backtests = useBacktestStore()
 
 const label = ref('Bybit sub-account')
 const apiKey = ref('')
@@ -85,7 +87,7 @@ async function clearTrades() {
 async function clearBacktests() {
   if (!confirm('Clear all saved backtests? This cannot be undone.')) return
   clearingBacktests.value = true
-  try { await backtestApi.clear() } finally { clearingBacktests.value = false }
+  try { await backtests.clearAll() } finally { clearingBacktests.value = false }
 }
 
 async function resetPaper() {

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ALL_STRATEGY_TYPES, STRATEGY_TYPE_NAMES, type StrategyType } from '@/api/client'
+import TimeframeSelect from '@/components/TimeframeSelect.vue'
 import { useStrategiesStore, instanceType, type StrategyInstance, type CreateInstancePayload, type UpdateInstancePayload } from '@/stores/strategies'
 import { useConfigStore } from '@/stores/config'
 
@@ -24,15 +25,6 @@ const formAutoMode = ref(false)
 const formParams = ref<Record<string, any>>({})
 
 const strategyTypes = ALL_STRATEGY_TYPES
-const timeframeOptions = [
-  { value: '1', label: '1m' },
-  { value: '5', label: '5m' },
-  { value: '15', label: '15m' },
-  { value: '30', label: '30m' },
-  { value: '60', label: '1h' },
-  { value: '240', label: '4h' },
-  { value: 'D', label: '1D' },
-]
 
 const typeBadgeClass: Record<StrategyType, string> = {
   break_bounce: 'badge-primary',
@@ -69,6 +61,26 @@ function snapshotParams(): Record<string, any> {
   return JSON.parse(JSON.stringify(formParams.value ?? {}))
 }
 
+function canonTf(raw: unknown): string {
+  if (raw == null || raw === '') return ''
+  const v = String(raw).trim()
+  const map: Record<string, string> = {
+    '1': '1', '1m': '1', '3': '3', '3m': '3', '5': '5', '5m': '5',
+    '15': '15', '15m': '15', '30': '30', '30m': '30',
+    '60': '60', '1h': '60', '60m': '60', '120': '120', '2h': '120',
+    '240': '240', '4h': '240', d: 'D', D: 'D', '1d': 'D', '1D': 'D',
+  }
+  return map[v] ?? map[v.toLowerCase()] ?? v
+}
+
+function normalizeIntervalFields(p: Record<string, any>): Record<string, any> {
+  const next = { ...p }
+  for (const key of ['timeframe', 'breakoutTimeframe', 'entryTimeframe', 'primaryTimeframe']) {
+    if (next[key] != null) next[key] = canonTf(next[key])
+  }
+  return next
+}
+
 function openCreate() {
   editingId.value = null
   formType.value = 'ema_pullback'
@@ -89,7 +101,7 @@ function openEdit(inst: StrategyInstance) {
   formSymbolsSelected.value = [...inst.symbols]
   formEnabled.value = inst.enabled
   formAutoMode.value = inst.autoMode ?? false
-  formParams.value = { ...(inst.params as Record<string, any>) }
+  formParams.value = normalizeIntervalFields({ ...(inst.params as Record<string, any>) })
   paramsForType.value = instanceType(inst)
   modalOpen.value = true
 }
@@ -108,7 +120,7 @@ async function onTypeChange() {
   if (paramsForType.value === next && Object.keys(formParams.value).length) return
   const defaults = await store.fetchDefaults(next)
   if (formType.value !== next) return
-  if (defaults) formParams.value = { ...defaults }
+  if (defaults) formParams.value = normalizeIntervalFields({ ...defaults })
   paramsForType.value = next
 }
 
@@ -157,7 +169,7 @@ async function confirmReset() {
   if (!confirmResetId.value) return
   const updated = await store.resetDefaults(confirmResetId.value)
   if (updated && editingId.value === updated.id) {
-    formParams.value = { ...(updated.params as Record<string, any>) }
+    formParams.value = normalizeIntervalFields({ ...(updated.params as Record<string, any>) })
     paramsForType.value = instanceType(updated)
   }
   confirmResetId.value = null
@@ -169,7 +181,7 @@ async function resetModalParams() {
     return
   }
   const defaults = await store.fetchDefaults(formType.value)
-  if (defaults) formParams.value = { ...defaults }
+  if (defaults) formParams.value = normalizeIntervalFields({ ...defaults })
 }
 
 async function toggleEnabled(inst: StrategyInstance) {
@@ -387,10 +399,13 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
           </div>
           <div class="form-control">
             <label class="label"><span class="label-text">Strategy Type</span></label>
+            <div v-if="editingId" class="input input-bordered input-sm flex items-center">
+              {{ STRATEGY_TYPE_NAMES[formType] }}
+            </div>
             <select
+              v-else
               v-model="formType"
-              class="select select-bordered select-sm"
-              :disabled="!!editingId"
+              class="select select-bordered select-sm w-full"
               @change="onTypeChange"
             >
               <option v-for="t in strategyTypes" :key="t" :value="t">{{ STRATEGY_TYPE_NAMES[t] }}</option>
@@ -435,21 +450,17 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
             <template v-if="formType === 'break_bounce'">
               <div class="grid grid-cols-2 gap-2">
                 <label class="form-control"><span class="label-text text-xs">Blueprint TF</span>
-                  <select v-model="formParams.primaryTimeframe" class="select select-bordered select-xs">
+                  <select v-model="formParams.primaryTimeframe" class="select select-bordered w-full h-10 min-h-10 leading-10 py-0">
                     <option value="D">Daily</option>
                     <option value="W">Weekly</option>
                     <option value="M">Monthly</option>
                   </select>
                 </label>
                 <label class="form-control"><span class="label-text text-xs">Breakout TF</span>
-                  <select v-model="formParams.breakoutTimeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.breakoutTimeframe" />
                 </label>
                 <label class="form-control"><span class="label-text text-xs">Entry TF</span>
-                  <select v-model="formParams.entryTimeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="'e'+tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.entryTimeframe" />
                 </label>
                 <label class="form-control"><span class="label-text text-xs">TP multiplier</span><input type="number" step="0.1" v-model.number="formParams.tpMultiplier" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Buffer %</span><input type="number" step="0.01" v-model.number="formParams.breakoutBufferPercent" class="input input-bordered input-xs" /></label>
@@ -493,9 +504,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">TP %</span><input type="number" v-model.number="formParams.takeProfitPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Trailing stop %</span><input type="number" v-model.number="formParams.trailingStopPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>
@@ -509,9 +518,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">TP %</span><input type="number" v-model.number="formParams.takeProfitPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Confirm candles</span><input type="number" v-model.number="formParams.confirmationCandles" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>
@@ -532,9 +539,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Volume confirm ×</span><input type="number" step="0.1" v-model.number="formParams.volumeConfirmMultiplier" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Squeeze width %</span><input type="number" step="0.1" v-model.number="formParams.squeezeThresholdPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>
@@ -546,9 +551,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">SL ATR mult</span><input type="number" v-model.number="formParams.atrMultiplier" class="input input-bordered input-xs" step="0.1" /></label>
                 <label class="form-control"><span class="label-text text-xs">TP ATR mult</span><input type="number" v-model.number="formParams.takeProfitAtrMultiplier" class="input input-bordered input-xs" step="0.1" /></label>
                 <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>
@@ -560,9 +563,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">SL %</span><input type="number" v-model.number="formParams.stopLossPercent" class="input input-bordered input-xs" step="0.1" /></label>
                 <label class="form-control"><span class="label-text text-xs">TP %</span><input type="number" v-model.number="formParams.takeProfitPercent" class="input input-bordered input-xs" step="0.1" /></label>
                 <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>
@@ -572,9 +573,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">ATR period</span><input type="number" v-model.number="formParams.atrPeriod" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Multiplier</span><input type="number" v-model.number="formParams.multiplier" class="input input-bordered input-xs" step="0.1" /></label>
                 <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>
@@ -586,9 +585,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">TP %</span><input type="number" v-model.number="formParams.takeProfitPercent" class="input input-bordered input-xs" step="0.05" /></label>
                 <label class="form-control"><span class="label-text text-xs">Session reset hour UTC</span><input type="number" min="0" max="23" v-model.number="formParams.sessionResetHour" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>
@@ -601,9 +598,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Session start hour UTC</span><input type="number" min="0" max="23" v-model.number="formParams.sessionStartHour" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Max trades / day</span><input type="number" min="1" v-model.number="formParams.maxTradesPerDay" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>
@@ -616,9 +611,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Max basis %</span><input type="number" step="0.05" v-model.number="formParams.maxBasisPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Stop basis %</span><input type="number" step="0.05" v-model.number="formParams.stopBasisPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>
@@ -631,9 +624,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Stop spread %</span><input type="number" step="0.01" v-model.number="formParams.stopSpreadPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Max hold (min)</span><input type="number" v-model.number="formParams.maxHoldMinutes" class="input input-bordered input-xs" /></label>
                 <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>
@@ -647,9 +638,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Hedge ratio</span><input type="number" step="0.1" min="0.1" max="1" v-model.number="formParams.hedgeRatio" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Backtest inventory USDT</span><input type="number" v-model.number="formParams.inventoryUsdt" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>
@@ -662,9 +651,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Recover %</span><input type="number" step="0.5" v-model.number="formParams.recoverPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Hedge portion</span><input type="number" step="0.1" min="0.1" max="1" v-model.number="formParams.hedgePortion" class="input input-bordered input-xs" /></label>
                 <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
-                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
-                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
-                  </select>
+                  <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
             </template>

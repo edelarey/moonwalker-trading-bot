@@ -192,18 +192,7 @@ export async function closeFromSignal(signal: StrategySignal, inst: StrategyInst
   return closed;
 }
 
-export async function openFromReversal(signal: ReversalSignal): Promise<Trade | null> {
-  const inst: StrategyInstance = {
-    id: 'break_bounce',
-    name: 'Break & Bounce',
-    strategyType: 'break_bounce',
-    symbols: [signal.symbol],
-    params: {},
-    enabled: true,
-    autoMode: true,
-    createdAt: 0,
-    updatedAt: 0,
-  };
+export async function openFromReversal(signal: ReversalSignal, inst: StrategyInstance): Promise<Trade | null> {
   return openFromSignal({
     type: 'entry',
     direction: signal.direction,

@@ -93,16 +93,19 @@ async function boot(): Promise<void> {
 
   engine.on('reversal', async (signal: ReversalSignal) => {
     broadcast({ type: 'reversal', signal });
-    logger.info('Reversal signal, checking AUTO mode', { symbol: signal.symbol });
-
-    const currentConfig = loadConfig();
-    if (!currentConfig.autoMode) {
-      logger.info('AUTO mode OFF — skipping auto trade', { symbol: signal.symbol });
+    const bb = getStrategyInstances().find(s =>
+      s.strategyType === 'break_bounce' && s.enabled && s.autoMode,
+    );
+    if (!bb) {
+      logger.info('Break & Bounce Auto off — skipping trade', { symbol: signal.symbol });
+      return;
+    }
+    if (bb.symbols.length && !bb.symbols.includes(signal.symbol)) {
       return;
     }
 
     try {
-      const trade = await openFromReversal(signal);
+      const trade = await openFromReversal(signal, bb);
       if (trade) engine.recordTrade(signal.symbol);
     } catch (err) {
       logger.error('AUTO trade failed', { symbol: signal.symbol, err });

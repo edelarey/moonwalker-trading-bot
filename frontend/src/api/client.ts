@@ -126,7 +126,7 @@ export interface BacktestParams {
 }
 export interface BacktestSummary {
   totalTrades: number; winningTrades: number; losingTrades: number
-  winRate: number; profitFactor: number; totalPnl: number
+  winRate: number; profitFactor: number | null; totalPnl: number
   maxDrawdown: number; maxDrawdownPercent: number; avgRR: number
   startingEquity: number; endingEquity: number
 }

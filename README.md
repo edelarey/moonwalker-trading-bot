@@ -77,7 +77,7 @@ Hedge defaults:
 
 ### Backtests
 
-- **Backtest** page: Strategy Instance (saved params) or Break & Bounce (Global). Only **BTCUSDT** is selected until you add coins. Dates, coins, and risk % are remembered in the browser.
+- **Backtest** page: pick any strategy instance, including Break & Bounce. Only **BTCUSDT** is selected until you add coins. Dates, coins, and risk % are remembered in the browser.
 - PnL is ending equity − start (default **$10,000**). **MaxDD** is the worst peak-to-trough on the closed-trade book in USDT — not the per-trade stop %. Signal backtests exit at **candle close**, which can overshoot the stop; leftover opens are marked at the last close.
 - Results live at **BT Results** (`/backtest/results`). `/strategies/results` redirects there.
 
@@ -100,7 +100,7 @@ Open **http://localhost:5180**.
 1. Stay on **Paper** (default).
 2. **Coin Scanner** — enable coins from the top 50 (or add any USDT perp).
 3. **Trading** or **Strategy Manager** — turn **On** + **Auto** on one or more strategies and pick coins.
-4. For Break & Bounce, also enable **AUTO** on the Trading page (it only fires inside the UTC liquidity window).
+4. Turn **On** + **Auto** on the strategy row (Break & Bounce uses the same toggles; it only fires inside the UTC liquidity window).
 5. Watch **Positions** for paper fills and SL/TP closes.
 
 ### One terminal vs two processes
@@ -205,9 +205,9 @@ Strategy-specific params are edited per instance in Strategy Manager.
 |------|-------------|
 | **Dashboard** | Paper/live badge, equity, PnL, breakouts, recent trades |
 | **Coin Scanner** | Top 50 Bybit USDT perps by 24h turnover; enable up to 50; add others manually |
-| **Trading** | Paper/Live switch, Break & Bounce AUTO + risk, **all strategies** with On / Auto / coin chips |
+| **Trading** | Paper/Live switch, shared risk/timeframes, **all strategies** (including Break & Bounce) with On / Auto / coin chips |
 | **Positions** | Open book + full history (filter paper/live, coin, strategy); CSV export |
-| **Backtest** | Historical run for a strategy instance or global Break & Bounce; BTCUSDT default; form remembered |
+| **Backtest** | Historical run for any strategy instance (including Break & Bounce); BTCUSDT default; form remembered |
 | **BT Results** | Summary metrics (incl. MaxDD USDT and %), equity curve, trade list |
 | **Strategy Manager** | Create/edit/reset-defaults/delete instances, deploy paper, run backtests |
 | **Settings** | Mode switch, paper reset, clear trade/backtest history, **sub-account keys**, risk % / sizing |
@@ -314,7 +314,7 @@ Signals (Break & Bounce reversals and registry `entry`/`exit`) go through `execu
 - Secrets live only under `backend/data/` and `backend/.env` (both gitignored).
 - Set a real `ENCRYPTION_KEY` before saving keys.
 - Header / sidebar show **PAPER** or **LIVE**.
-- AUTO / per-strategy Auto are off until you turn them on.
+- Per-strategy Auto is off until you turn it on (including Break & Bounce).
 
 ---
 

@@ -64,11 +64,6 @@ function coinsLabel(inst: StrategyInstance) {
   return inst.symbols.join(', ')
 }
 
-const autoMode = computed({
-  get: () => (config.config as any)?.autoMode ?? false,
-  set: (val: boolean) => config.updateConfig({ autoMode: val } as any),
-})
-
 const reversals = computed(() => market.reversals.slice(0, 10))
 
 const activeStrategies = computed(() => strategiesStore.instances.filter(i => i.enabled))
@@ -130,33 +125,6 @@ function signalBadgeClass(signal: string): string {
       Run several strategies at once. Enable each one, turn Auto on, and pick coins from your tracked list
       (Coin Scanner → top 50). Empty coin list = every enabled coin.
     </p>
-
-    <!-- AUTO Mode Toggle -->
-    <div class="card bg-base-200 border border-base-300">
-      <div class="card-body p-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="card-title text-base">AUTO Mode (Break &amp; Bounce)</h2>
-            <p class="text-sm text-base-content/60 mt-1">
-              When enabled, Break &amp; Bounce reversals are executed in the current trading mode
-              (paper fills by default). Other strategies use their own Auto toggle in Strategy Manager.
-            </p>
-          </div>
-          <label class="flex items-center gap-3 cursor-pointer">
-            <span class="text-sm font-medium" :class="autoMode ? 'text-profit' : 'text-base-content/50'">
-              {{ autoMode ? 'AUTO ON' : 'AUTO OFF' }}
-            </span>
-            <input
-              type="checkbox"
-              class="toggle toggle-lg"
-              :class="autoMode ? 'toggle-success' : ''"
-              :checked="autoMode"
-              @change="autoMode = !autoMode"
-            />
-          </label>
-        </div>
-      </div>
-    </div>
 
     <!-- Risk Parameters -->
     <div class="card bg-base-200 border border-base-300">
