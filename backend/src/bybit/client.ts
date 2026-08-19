@@ -1,8 +1,9 @@
 import { RestClientV5 } from 'bybit-api';
 import { logger } from '../logger';
-import { Candle, CandleInterval } from '../types';
+import { Candle, CandleInterval, EquitySource, LiveEquitySnapshot, resolveEquitySource } from '../types';
 import { resolveApiCredentials } from '../security/secrets';
 import { intervalToMs } from '../strategy/intervals';
+import { loadConfig } from '../config';
 
 let _client: RestClientV5 | null = null;
 
@@ -210,11 +211,47 @@ export async function getMarkPrice(symbol: string): Promise<number> {
  * Get account equity (USDT wallet balance).
  */
 export async function getAccountEquity(): Promise<number> {
+  const snap = await getLiveEquity();
+  return snap.equity;
+}
+
+function parseWalletNum(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : parseFloat(String(value));
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Unified USDT coin line, plus Bybit account-level USD margin (totalMarginBalance,
+ * then totalEquity, then sum of coin usdValue). Isolated still needs USDT for
+ * these linear perps; non-USDT coins only count after they are enabled as
+ * collateral in Cross or Portfolio.
+ */
+export async function getLiveEquity(source?: EquitySource): Promise<LiveEquitySnapshot> {
   const client = getBybitClient();
+  const resolved = source ?? resolveEquitySource(loadConfig().equitySource);
   const response = await client.getWalletBalance({ accountType: 'UNIFIED' });
   if (response.retCode !== 0) throw new Error(response.retMsg);
-  const coin = (response.result.list[0].coin as any[]).find(c => c.coin === 'USDT');
-  return coin ? parseFloat(coin.equity) : 0;
+  const acct = response.result.list[0];
+  const coins = acct?.coin ?? [];
+  const usdt = coins.find(c => c.coin === 'USDT');
+  const usdtEquity = parseWalletNum(usdt?.equity) ?? 0;
+
+  const summedUsd = coins.reduce((sum, c) => sum + (parseWalletNum(c.usdValue) ?? 0), 0);
+  const unifiedUsdEquity =
+    parseWalletNum(acct?.totalMarginBalance)
+    ?? parseWalletNum(acct?.totalEquity)
+    ?? summedUsd;
+
+  const equity = resolved === 'unified_usd' ? unifiedUsdEquity : usdtEquity;
+  return {
+    equity,
+    mode: 'live',
+    equitySource: resolved,
+    usdtEquity,
+    unifiedUsdEquity,
+    currency: resolved === 'unified_usd' ? 'USD' : 'USDT',
+  };
 }
 
 /**

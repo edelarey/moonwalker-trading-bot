@@ -9,6 +9,7 @@ import { paperBroker } from '../../execution/paperBroker';
 import { loadConfig } from '../../config';
 import { fetchCandlesRange } from '../../bybit/client';
 import { calcSummary, makeBacktestTrade } from '../backtestUtils';
+import { dayStartUtcMs } from '../../util/dates';
 import { sizePosition } from '../riskManager';
 
 export class DrawdownHedgeStrategy implements IStrategy {
@@ -71,8 +72,8 @@ export class DrawdownHedgeStrategy implements IStrategy {
 
   async backtest(params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
     const p = params.params as unknown as DrawdownHedgeParams;
-    const startMs = new Date(params.startDate + 'T00:00:00Z').getTime();
-    const endMs = new Date(params.endDate + 'T00:00:00Z').getTime() + 86_400_000;
+    const startMs = dayStartUtcMs(params.startDate);
+    const endMs = dayStartUtcMs(params.endDate) + 86_400_000;
     const tf = String(p.timeframe || '15');
     const cfg = loadConfig();
     const trades = [];

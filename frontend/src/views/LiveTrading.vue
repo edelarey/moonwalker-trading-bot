@@ -5,8 +5,10 @@ import { useConfigStore } from '@/stores/config'
 import { useMarketStore } from '@/stores/market'
 import { useStrategiesStore, instanceType, type StrategySignal, type StrategyInstance } from '@/stores/strategies'
 import { keysApi, type ApiKeyStatus } from '@/api/client'
+import { useTradesStore } from '@/stores/trades'
 
 const config = useConfigStore()
+const trades = useTradesStore()
 const market = useMarketStore()
 const strategiesStore = useStrategiesStore()
 const router = useRouter()
@@ -26,7 +28,8 @@ const enabledCoins = computed(() =>
 
 async function setPaper() {
   modeError.value = ''
-  await config.updateConfig({ tradingMode: 'paper' })
+  const ok = await config.updateConfig({ tradingMode: 'paper' })
+  if (ok) await trades.fetchEquity()
 }
 
 async function setLive() {
@@ -40,8 +43,10 @@ async function setLive() {
     return
   }
   const ok = await config.updateConfig({ tradingMode: 'live' })
-  if (ok) liveConfirm.value = ''
-  else modeError.value = config.error ?? 'Could not switch to live'
+  if (ok) {
+    liveConfirm.value = ''
+    await trades.fetchEquity()
+  } else modeError.value = config.error ?? 'Could not switch to live'
 }
 
 async function toggleAuto(inst: StrategyInstance) {

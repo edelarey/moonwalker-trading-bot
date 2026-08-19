@@ -10,6 +10,8 @@ const faqs = [
   { q: 'Did my strategy edits get saved?', a: 'Yes — Update writes params to strategy-instances.json. A backend restart no longer overwrites them. Use Reset defaults on a card (or in the editor) if you want the factory starting values back. Names do not include the word Default; they are just the strategy name.' },
   { q: 'Why is Max Drawdown larger than my stop-loss %?', a: 'MaxDD is the largest peak-to-trough drop in account equity (USDT) across the backtest, not the per-trade stop. Consecutive losers add up. Risk % (default 1%) is how much equity one exact stop costs. This engine also fills exits at the candle close, which can overshoot the stop, and leftover open trades are marked at the last close.' },
   { q: 'Do hedge strategies send live orders?', a: 'dynamic_delta and drawdown_hedge send a Bybit USDT-perp hedge. funding_arb live only shorts the perp (you must hold spot yourself). cross_exchange live only hedges on Bybit — no Binance order is sent. Paper simulates the full idea for all four.' },
+  { q: 'Will the Dashboard show my BTC or XRP balance?', a: 'Paper always shows virtual USDT. Live shows one number: the Unified USDT coin line (default), or Bybit totalMarginBalance in USD if Settings → Equity source is Total Unified USD collateral. BTC/XRP only count in that second mode after you enable them as collateral on Bybit and use Cross or Portfolio. Isolated still needs USDT. These contracts still settle PnL in USDT.' },
+  { q: 'What date format do backtest ranges use?', a: 'Day first: dd-mm-YYYY (for example 19-08-2026). Type it or use the calendar button. Saved results show the same format. The API still stores ISO YYYY-MM-DD internally.' },
 ]
 </script>
 
@@ -130,7 +132,8 @@ const faqs = [
           <table class="table table-sm">
             <thead><tr><th>Setting</th><th>Default</th><th>Description</th></tr></thead>
             <tbody>
-              <tr><td class="font-semibold text-sm">Risk % per trade</td><td class="font-mono">1%</td><td class="text-xs text-base-content/70">Maximum % of account equity risked on a single trade. 1% is the recommended maximum for conservative trading. On a $10,000 account, 1% = $100 max risk per trade.</td></tr>
+              <tr><td class="font-semibold text-sm">Risk % per trade</td><td class="font-mono">1%</td><td class="text-xs text-base-content/70">Maximum % of account equity risked on a single trade. 1% is the recommended maximum for conservative trading. On a $10,000 account, 1% = $100 max risk per trade. Live equity is the source below.</td></tr>
+              <tr><td class="font-semibold text-sm">Equity source</td><td class="font-mono">USDT only</td><td class="text-xs text-base-content/70">Live only (Settings). <strong>USDT only</strong> reads the Unified USDT coin line. <strong>Total Unified USD collateral</strong> reads Bybit <code>totalMarginBalance</code> (enabled coins after haircuts). Paper stays virtual USDT. Isolated margin still requires USDT for these perps. Settlement is always USDT — this is not a coin picker.</td></tr>
               <tr><td class="font-semibold text-sm">TP Multiplier (R:R)</td><td class="font-mono">2.5</td><td class="text-xs text-base-content/70">Take-profit = (Entry-to-SL distance) × this multiplier. At 2.5, you aim to make 2.5× what you risk. Higher = fewer wins, bigger winners. Lower = more wins, smaller gains.</td></tr>
               <tr><td class="font-semibold text-sm">Liquidity Window Start</td><td class="font-mono">00:00 UTC</td><td class="text-xs text-base-content/70">The strategy only enters new trades after this UTC time each day. Midnight UTC marks the start of the most liquid crypto trading session.</td></tr>
               <tr><td class="font-semibold text-sm">Liquidity Window End</td><td class="font-mono">02:30 UTC</td><td class="text-xs text-base-content/70">No new trade entries after this time. Limits trading to the high-volume 2.5-hour window after the UTC open. Adjust for NY Open (13:30 UTC) if preferred.</td></tr>
@@ -203,7 +206,7 @@ const faqs = [
         </div>
         <div class="p-4 rounded-lg bg-base-300 space-y-2">
           <p class="font-semibold text-sm">📄 Paper vs Testnet vs Live</p>
-          <p class="text-xs text-base-content/70"><strong>Paper</strong> (default) uses live Bybit prices and simulates fills, fees, and SL/TP locally. No API keys and no orders. <strong>Bybit testnet</strong> is a separate exchange sandbox — only used if Trading Mode is Live and <code>BYBIT_TESTNET=true</code>. <strong>Live</strong> sends real orders. Switch modes in <strong>Settings</strong>.</p>
+          <p class="text-xs text-base-content/70"><strong>Paper</strong> (default) uses live Bybit prices and simulates fills, fees, and SL/TP locally. No API keys and no orders. Equity is virtual USDT. <strong>Bybit testnet</strong> is a separate exchange sandbox — only used if Trading Mode is Live and the saved key is marked testnet. <strong>Live</strong> sends real orders. Dashboard live equity is Settings → Equity source: Unified USDT, or total Unified USD collateral. Switch modes in <strong>Settings</strong>.</p>
           <p class="text-xs text-loss font-medium mt-1">⚠ Stay in paper until a strategy shows stable paper results. Type LIVE in Settings to leave paper mode.</p>
         </div>
       </div>
@@ -219,7 +222,7 @@ const faqs = [
         <ol class="list-decimal list-inside space-y-1 text-sm text-base-content/80">
           <li>Go to <strong>Backtest</strong> in the sidebar</li>
           <li>Pick a strategy (Break &amp; Bounce is in the same list as the others). Params come from Strategy Manager</li>
-          <li>Select a date range. Risk % is how much equity one exact stop costs (default 1%)</li>
+          <li>Select a date range as <strong>dd-mm-YYYY</strong> (day first). Risk % is how much equity one exact stop costs (default 1%)</li>
           <li>Only <strong>BTCUSDT</strong> is selected by default. Your last coins, dates, and risk are remembered in the browser</li>
           <li>Strategy params are read-only here — edit them in Strategy Manager</li>
           <li>Click <strong>▶ Run Backtest</strong>. Results open at <strong>BT Results</strong> (same page as Strategy Results)</li>
@@ -449,7 +452,7 @@ const faqs = [
                 <span class="text-lg flex-shrink-0">🧪</span>
                 <div>
                   <p class="font-semibold text-xs">Backtest</p>
-                  <p class="text-xs text-base-content/60 mt-0.5">Go to <strong>Backtest</strong> → select a saved strategy → set a date range → run a historical simulation. Use the results to validate and refine parameters before going live.</p>
+                  <p class="text-xs text-base-content/60 mt-0.5">Go to <strong>Backtest</strong> → select a saved strategy → set a date range (<span class="font-mono">dd-mm-YYYY</span>) → run a historical simulation. Use the results to validate and refine parameters before going live.</p>
                 </div>
               </div>
               <div class="flex gap-3 p-3 rounded-lg bg-base-200">

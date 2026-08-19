@@ -38,13 +38,22 @@ async function refreshKeys() {
 }
 
 async function setPaper() {
-  await config.updateConfig({ tradingMode: 'paper' })
+  const ok = await config.updateConfig({ tradingMode: 'paper' })
+  if (ok) await trades.fetchEquity()
 }
 
 async function setLive() {
   if (liveConfirm.value !== 'LIVE') return
   const ok = await config.updateConfig({ tradingMode: 'live' })
-  if (ok) liveConfirm.value = ''
+  if (ok) {
+    liveConfirm.value = ''
+    await trades.fetchEquity()
+  }
+}
+
+async function setEquitySource(source: 'usdt' | 'unified_usd') {
+  const ok = await config.updateConfig({ equitySource: source })
+  if (ok) await trades.fetchEquity()
 }
 
 async function saveKeys() {
@@ -174,6 +183,26 @@ async function resetPaper() {
               />
               <span class="label-text-alt text-xs mt-1 text-base-content/40">1 = no leverage. Strategy editor can override per instance.</span>
             </label>
+            <div class="sm:col-span-2 space-y-2">
+              <h3 class="text-sm font-semibold">Equity source (live)</h3>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  class="btn btn-sm"
+                  :class="(config.config.equitySource ?? 'usdt') === 'usdt' ? 'btn-primary' : 'btn-outline'"
+                  @click="setEquitySource('usdt')"
+                >USDT only</button>
+                <button
+                  class="btn btn-sm"
+                  :class="config.config.equitySource === 'unified_usd' ? 'btn-primary' : 'btn-outline'"
+                  @click="setEquitySource('unified_usd')"
+                >Total Unified USD collateral</button>
+              </div>
+              <p class="text-xs text-base-content/50">
+                Paper always uses virtual USDT. Live: <strong>USDT only</strong> is the Unified USDT coin line.
+                <strong>Total Unified USD collateral</strong> uses Bybit <code>totalMarginBalance</code>
+                (enabled collateral after haircuts). Isolated still needs USDT. Settlement of these perps stays USDT.
+              </p>
+            </div>
             <label class="form-control sm:col-span-2">
               <span class="label-text text-xs mb-1">Stop fill (backtest default)</span>
               <select

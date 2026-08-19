@@ -8,6 +8,7 @@ export const api = axios.create({
 
 export type TradingMode = 'paper' | 'live'
 export type TradeMode = 'paper' | 'live' | 'backtest'
+export type EquitySource = 'usdt' | 'unified_usd'
 export type StrategyType =
   | 'break_bounce'
   | 'dca'
@@ -69,6 +70,7 @@ export interface AppConfig {
   entryTimeframe: '1' | '3' | '5' | '15' | '30'
   autoMode?: boolean
   tradingMode?: TradingMode
+  equitySource?: EquitySource
   paperStartingEquity?: number
   paperFeeBps?: number
   paperSlippageBps?: number
@@ -99,6 +101,14 @@ export interface PaperAccountSnapshot {
   totalFees: number
   openCount: number
   updatedAt: number
+}
+export interface LiveEquitySnapshot {
+  equity: number
+  mode: 'live'
+  equitySource: EquitySource
+  usdtEquity: number
+  unifiedUsdEquity: number
+  currency: 'USDT' | 'USD'
 }
 export interface PaperPositionView {
   tradeId: string
@@ -201,7 +211,7 @@ export const positionsApi = {
     api.post(`/positions/${symbol}/close`, { side, qty, tradeId }).then(r => r.data),
 }
 export const accountApi = {
-  equity: () => api.get<{ equity: number } & Partial<PaperAccountSnapshot>>('/account/equity').then(r => r.data),
+  equity: () => api.get<(Partial<PaperAccountSnapshot> & Partial<LiveEquitySnapshot>) & { equity: number }>('/account/equity').then(r => r.data),
 }
 export const paperApi = {
   account: () => api.get<PaperAccountSnapshot>('/paper/account').then(r => r.data),

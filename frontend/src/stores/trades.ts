@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { tradesApi, positionsApi, accountApi, paperApi, type Trade, type PaperAccountSnapshot } from '@/api/client'
+import { tradesApi, positionsApi, accountApi, paperApi, type Trade, type PaperAccountSnapshot, type LiveEquitySnapshot } from '@/api/client'
 
 export const useTradesStore = defineStore('trades', () => {
   const trades = ref<Trade[]>([])
   const positions = ref<any[]>([])
   const equity = ref<number>(0)
   const paper = ref<PaperAccountSnapshot | null>(null)
+  const liveEquity = ref<LiveEquitySnapshot | null>(null)
   const loading = ref(false)
 
   const openTrades = computed(() => trades.value.filter(t => t.status === 'open'))
@@ -35,6 +36,18 @@ export const useTradesStore = defineStore('trades', () => {
     try {
       const data = await accountApi.equity()
       equity.value = data.equity
+      if (data.mode === 'live') {
+        liveEquity.value = {
+          equity: data.equity,
+          mode: 'live',
+          equitySource: data.equitySource ?? 'usdt',
+          usdtEquity: data.usdtEquity ?? 0,
+          unifiedUsdEquity: data.unifiedUsdEquity ?? data.equity,
+          currency: data.currency ?? (data.equitySource === 'unified_usd' ? 'USD' : 'USDT'),
+        }
+      } else {
+        liveEquity.value = null
+      }
       if (data.mode === 'paper' || data.startingEquity != null) {
         paper.value = {
           mode: 'paper',
@@ -86,7 +99,7 @@ export const useTradesStore = defineStore('trades', () => {
   }
 
   return {
-    trades, positions, equity, paper, loading,
+    trades, positions, equity, paper, liveEquity, loading,
     openTrades, closedTrades, paperTrades, totalPnl, winRate,
     fetchTrades, fetchPositions, fetchEquity, resetPaper, clearHistory, closePosition, addTrade, setPaperAccount,
   }

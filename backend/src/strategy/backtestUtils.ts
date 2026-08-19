@@ -6,6 +6,7 @@ import { logger } from '../logger';
 import { loadConfig } from '../config';
 import { resolveLeverage, sizePosition } from './riskManager';
 import { fillStopOnBar, resolveStopFillMode } from './stopFill';
+import { dayStartUtcMs } from '../util/dates';
 
 export function calcSummary(trades: Trade[], startEquity: number, endEquity: number): BacktestSummary {
   const winners = trades.filter(t => (t.pnl ?? 0) > 0);
@@ -90,8 +91,8 @@ export async function runSignalBacktest(opts: {
   create: (inst: StrategyInstance) => IStrategy;
   timeframe: string;
 }): Promise<StrategyBacktestResult> {
-  const startMs = new Date(opts.params.startDate + 'T00:00:00Z').getTime();
-  const endMs = new Date(opts.params.endDate + 'T00:00:00Z').getTime() + 86_400_000;
+  const startMs = dayStartUtcMs(opts.params.startDate);
+  const endMs = dayStartUtcMs(opts.params.endDate) + 86_400_000;
   const trades: Trade[] = [];
   let equity = opts.params.startingEquity;
   const equityCurve = [{ time: startMs, equity }];

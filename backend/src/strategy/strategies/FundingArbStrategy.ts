@@ -10,6 +10,7 @@ import { paperBroker } from '../../execution/paperBroker';
 import { store } from '../../storage/store';
 import { logger } from '../../logger';
 import { calcSummary, makeBacktestTrade } from '../backtestUtils';
+import { dayStartUtcMs } from '../../util/dates';
 
 export class FundingArbStrategy implements IStrategy {
   readonly id: string;
@@ -101,8 +102,8 @@ export class FundingArbStrategy implements IStrategy {
 
   async backtest(params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
     const p = params.params as unknown as FundingArbParams;
-    const startMs = new Date(params.startDate + 'T00:00:00Z').getTime();
-    const endMs = new Date(params.endDate + 'T00:00:00Z').getTime() + 86_400_000;
+    const startMs = dayStartUtcMs(params.startDate);
+    const endMs = dayStartUtcMs(params.endDate) + 86_400_000;
     const trades = [];
     let equity = params.startingEquity;
     const equityCurve = [{ time: startMs, equity }];

@@ -5,6 +5,7 @@ import StatCard from '@/components/StatCard.vue'
 import TradeRow from '@/components/TradeRow.vue'
 import EquityCurve from '@/components/EquityCurve.vue'
 import { backtestApi } from '@/api/client'
+import { formatDateRange, formatDay } from '@/lib/dateFormat'
 
 const store = useBacktestStore()
 const busy = ref(false)
@@ -70,7 +71,7 @@ const runSettings = computed<{ label: string; value: string }[]>(() => {
     { label: 'Strategy', value: label(r) },
     { label: 'Type', value: String(r.strategyType ?? '—') },
     { label: 'Symbols', value: (p.symbols ?? []).join(', ') || '—' },
-    { label: 'Range', value: `${p.startDate ?? '—'} → ${p.endDate ?? '—'}` },
+    { label: 'Range', value: formatDateRange(p.startDate, p.endDate) },
     { label: 'Risk %', value: p.riskPercent != null ? String(p.riskPercent) : '—' },
     { label: 'Leverage', value: p.leverage != null ? `${p.leverage}×` : '—' },
     { label: 'Sizing', value: p.sizingMode === 'fixed_usdt'
@@ -95,7 +96,7 @@ const runSettings = computed<{ label: string; value: string }[]>(() => {
         <p v-if="hasResults && result" class="text-sm text-base-content/60 mt-0.5">
           {{ label(result) }}
           · {{ result.params?.symbols?.join(', ') }}
-          · {{ result.params.startDate }} → {{ result.params.endDate }}
+          · {{ formatDateRange(result.params.startDate, result.params.endDate) }}
           · PnL is profit vs $ {{ fmtNum(result.summary.startingEquity, 0, '10,000') }} start, not the closing balance
         </p>
       </div>
@@ -127,7 +128,7 @@ const runSettings = computed<{ label: string; value: string }[]>(() => {
         :class="result?.id === r.id ? 'btn-primary' : 'btn-outline'"
         @click="selectResult(r.id)"
       >
-        {{ new Date(r.runAt).toLocaleDateString() }} — {{ label(r) }} — {{ (r.params?.symbols ?? []).slice(0, 3).join(',') }}
+        {{ formatDay(r.runAt) }} — {{ label(r) }} — {{ (r.params?.symbols ?? []).slice(0, 3).join(',') }}
       </button>
     </div>
 

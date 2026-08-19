@@ -33,6 +33,7 @@ const DEFAULT_CONFIG: AppConfig = {
   breakoutTimeframe: '15',
   entryTimeframe: '5',
   tradingMode: 'paper',
+  equitySource: 'usdt',
   paperStartingEquity: 10000,
   paperFeeBps: 6,
   paperSlippageBps: 3,

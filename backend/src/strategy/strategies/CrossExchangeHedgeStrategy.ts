@@ -9,6 +9,7 @@ import { Candle, StrategySignal, StrategyInstance, CrossExchangeParams } from '.
 import { fetchBinanceLast, fetchCandlesRange, getMarkPrice } from '../../bybit/client';
 import { logger } from '../../logger';
 import { calcSummary, makeBacktestTrade } from '../backtestUtils';
+import { dayStartUtcMs } from '../../util/dates';
 import { loadConfig } from '../../config';
 import { sizePosition } from '../riskManager';
 
@@ -95,8 +96,8 @@ export class CrossExchangeHedgeStrategy implements IStrategy {
 
   async backtest(params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
     const p = params.params as unknown as CrossExchangeParams;
-    const startMs = new Date(params.startDate + 'T00:00:00Z').getTime();
-    const endMs = new Date(params.endDate + 'T00:00:00Z').getTime() + 86_400_000;
+    const startMs = dayStartUtcMs(params.startDate);
+    const endMs = dayStartUtcMs(params.endDate) + 86_400_000;
     const tf = String(p.timeframe || '5');
     const cfg = loadConfig();
     const trades = [];

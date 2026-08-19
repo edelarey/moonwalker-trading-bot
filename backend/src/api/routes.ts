@@ -4,9 +4,9 @@ import { store } from '../storage/store';
 import { runBacktest } from '../backtest/engine';
 import { refreshDailyRanges } from '../scheduler/cron';
 import { wsManager } from '../bybit/websocket';
-import { getOpenPositions, closePosition, getAccountEquity, fetchTopLinearMarkets, resetBybitClient } from '../bybit/client';
+import { getOpenPositions, closePosition, getLiveEquity, fetchTopLinearMarkets, resetBybitClient } from '../bybit/client';
 import { logger } from '../logger';
-import { ALL_STRATEGY_TYPES, BacktestParams, MAX_ENABLED_SYMBOLS, StrategyInstance, StrategyType } from '../types';
+import { ALL_STRATEGY_TYPES, BacktestParams, MAX_ENABLED_SYMBOLS, resolveEquitySource, StrategyInstance, StrategyType } from '../types';
 import { clearStoredKeys, getApiKeyStatus, hasApiKeys, saveStoredKeys } from '../security/secrets';
 import { Parser } from 'json2csv';
 import { strategyRegistry } from '../strategy/registry';
@@ -15,6 +15,7 @@ import { activateStrategy, deactivateStrategy, syncEngineSymbols, syncSubscripti
 import { resolveStopFillMode } from '../strategy/stopFill';
 import { paperBroker } from '../execution/paperBroker';
 import { v4 as uuidv4 } from 'uuid';
+import { toIsoDate } from '../util/dates';
 
 const router = Router();
 
@@ -33,6 +34,12 @@ router.put('/config', (req: Request, res: Response) => {
     const updated = { ...current, ...req.body };
     if (updated.tradingMode === 'live' && !hasApiKeys()) {
       return res.status(400).json({ error: 'Save Bybit API keys in Settings before switching to live' }) as any;
+    }
+    if (req.body?.equitySource != null && req.body.equitySource !== 'usdt' && req.body.equitySource !== 'unified_usd') {
+      return res.status(400).json({ error: 'equitySource must be usdt or unified_usd' }) as any;
+    }
+    if (updated.equitySource != null) {
+      updated.equitySource = resolveEquitySource(updated.equitySource);
     }
     if (Array.isArray(updated.symbols)) {
       let enabledSeen = 0;
@@ -229,8 +236,8 @@ router.get('/account/equity', async (_req: Request, res: Response) => {
       const snap = paperBroker.getSnapshot();
       return res.json(snap) as any;
     }
-    const equity = await getAccountEquity();
-    res.json({ equity, mode: 'live' });
+    const snap = await getLiveEquity();
+    res.json(snap);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -362,10 +369,12 @@ router.post('/strategies/:id/backtest', async (req: Request, res: Response) => {
     const leverage = Number(req.body.leverage) > 0
       ? Number(req.body.leverage)
       : (Number((inst.params as Record<string, unknown>)?.leverage) || config.leverage || 1);
+    const startDate = toIsoDate(req.body.startDate);
+    const endDate = toIsoDate(req.body.endDate);
     const result = await strategyRegistry.runBacktest(inst, {
       symbols,
-      startDate: req.body.startDate,
-      endDate: req.body.endDate,
+      startDate,
+      endDate,
       params: inst.params,
       riskPercent: req.body.riskPercent ?? config.riskPercent,
       startingEquity: req.body.startingEquity ?? config.paperStartingEquity ?? 10_000,
@@ -375,8 +384,8 @@ router.post('/strategies/:id/backtest', async (req: Request, res: Response) => {
       id: uuidv4(),
       params: {
         symbols,
-        startDate: req.body.startDate,
-        endDate: req.body.endDate,
+        startDate,
+        endDate,
         riskPercent: req.body.riskPercent ?? config.riskPercent,
         tpMultiplier: config.tpMultiplier,
         liquidityWindowStart: config.liquidityWindowStart,

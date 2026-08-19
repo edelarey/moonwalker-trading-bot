@@ -18,6 +18,18 @@ const enabledSymbols = computed(() =>
 const winRatePct = computed(() => (trades.winRate * 100).toFixed(1) + '%')
 const totalPnlSign = computed(() => (trades.totalPnl >= 0 ? 'up' : 'down') as 'up' | 'down')
 const pnlDisplay = computed(() => (trades.totalPnl >= 0 ? '+' : '') + trades.totalPnl.toFixed(2) + ' USDT')
+const isPaper = computed(() => (config.config?.tradingMode ?? 'paper') === 'paper')
+const equityTitle = computed(() => {
+  if (isPaper.value) return 'Paper Equity'
+  const source = trades.liveEquity?.equitySource ?? config.config?.equitySource ?? 'usdt'
+  return source === 'unified_usd' ? 'Account Equity (Unified USD)' : 'Account Equity (USDT)'
+})
+const equitySubtitle = computed(() => {
+  if (isPaper.value) return 'Virtual USDT'
+  const live = trades.liveEquity
+  if (!live) return 'Live — waiting for Bybit'
+  return `USDT line ${live.usdtEquity.toFixed(2)} · Unified margin ${live.unifiedUsdEquity.toFixed(2)}`
+})
 </script>
 
 <template>
@@ -35,8 +47,9 @@ const pnlDisplay = computed(() => (trades.totalPnl >= 0 ? '+' : '') + trades.tot
     <!-- Stats Row -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <StatCard
-        :title="(config.config?.tradingMode ?? 'paper') === 'paper' ? 'Paper Equity' : 'Account Equity'"
+        :title="equityTitle"
         :value="'$' + trades.equity.toFixed(2)"
+        :subtitle="equitySubtitle"
         icon="💰"
       />
       <StatCard title="Total P&L" :value="pnlDisplay" :trend="totalPnlSign" icon="📈" />

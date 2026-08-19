@@ -4,6 +4,15 @@ import { useStrategiesStore, type StrategyType } from '@/stores/strategies'
 import { useBacktestStore } from '@/stores/backtest'
 import { backtestApi, type BacktestResult } from '@/api/client'
 import { ref } from 'vue'
+import { formatDateRange, formatDay } from '@/lib/dateFormat'
+
+function formatWhen(ms: number): string {
+  const d = new Date(ms)
+  if (!Number.isFinite(d.getTime())) return '—'
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${formatDay(ms)} ${hh}:${mm}`
+}
 
 const store = useStrategiesStore()
 const backtests = useBacktestStore()
@@ -90,7 +99,7 @@ const display = computed(() =>
     type: r.strategyType ?? 'break_bounce',
     when: r.runAt,
     symbols: r.params.symbols.join(', '),
-    range: `${r.params.startDate} → ${r.params.endDate}`,
+    range: formatDateRange(r.params.startDate, r.params.endDate),
     totalTrades: r.summary.totalTrades,
     winRate: r.summary.winRate,
     totalPnl: r.summary.totalPnl,
@@ -141,7 +150,7 @@ const display = computed(() =>
         </thead>
         <tbody>
           <tr v-for="result in display" :key="result.id" class="hover">
-            <td class="text-xs whitespace-nowrap">{{ new Date(result.when).toLocaleString() }}</td>
+            <td class="text-xs whitespace-nowrap">{{ formatWhen(result.when) }}</td>
             <td class="font-medium">{{ result.name }}</td>
             <td>
               <span class="badge badge-sm" :class="typeBadgeClass[result.type] ?? 'badge-neutral'">{{ result.type }}</span>

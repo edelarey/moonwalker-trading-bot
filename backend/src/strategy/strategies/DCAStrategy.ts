@@ -12,6 +12,7 @@ import { IStrategy, BacktestStrategyParams, StrategyBacktestResult } from '../IS
 import { Candle, StrategySignal, StrategyInstance, DCAParams, Trade } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../../logger';
+import { dayStartUtcMs } from '../../util/dates';
 
 export class DCAStrategy implements IStrategy {
   readonly id: string;
@@ -96,8 +97,8 @@ export class DCAStrategy implements IStrategy {
 
   async backtest(params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
     const { fetchCandlesRange } = await import('../../bybit/client');
-    const startMs = new Date(params.startDate + 'T00:00:00Z').getTime();
-    const endMs = new Date(params.endDate + 'T00:00:00Z').getTime() + 86400000;
+    const startMs = dayStartUtcMs(params.startDate);
+    const endMs = dayStartUtcMs(params.endDate) + 86400000;
     const p = params.params as unknown as DCAParams;
     const trades: Trade[] = [];
     let equity = params.startingEquity;

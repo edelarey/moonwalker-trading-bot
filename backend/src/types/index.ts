@@ -59,6 +59,21 @@ export type TradingMode = 'paper' | 'live';
 export type TradeMode = 'paper' | 'live' | 'backtest';
 export type SizingMode = 'risk_percent' | 'fixed_usdt';
 export type StopFillMode = 'stop_price' | 'bar_close';
+/** Live equity only. Paper stays virtual USDT. */
+export type EquitySource = 'usdt' | 'unified_usd';
+
+export function resolveEquitySource(raw?: string | null): EquitySource {
+  return raw === 'unified_usd' ? 'unified_usd' : 'usdt';
+}
+
+export interface LiveEquitySnapshot {
+  equity: number;
+  mode: 'live';
+  equitySource: EquitySource;
+  usdtEquity: number;
+  unifiedUsdEquity: number;
+  currency: 'USDT' | 'USD';
+}
 
 export interface Trade {
   id: string;
@@ -119,6 +134,8 @@ export interface AppConfig {
   entryTimeframe: '1' | '3' | '5' | '15' | '30';  // Entry/reversal candle (default '5')
   autoMode?: boolean;
   tradingMode?: TradingMode;
+  /** Live only. `usdt` = Unified USDT coin line; `unified_usd` = Bybit totalMarginBalance (USD). */
+  equitySource?: EquitySource;
   paperStartingEquity?: number;
   paperFeeBps?: number;
   paperSlippageBps?: number;
@@ -157,7 +174,7 @@ export interface PaperPositionView {
 
 export interface BacktestParams {
   symbols: string[];
-  startDate: string;   // YYYY-MM-DD
+  startDate: string;   // stored YYYY-MM-DD; UI is dd-mm-YYYY
   endDate: string;
   riskPercent: number;
   tpMultiplier: number;

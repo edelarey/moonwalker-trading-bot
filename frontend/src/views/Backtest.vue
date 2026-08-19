@@ -4,6 +4,8 @@ import { useConfigStore } from '@/stores/config'
 import { useBacktestStore } from '@/stores/backtest'
 import { useStrategiesStore, instanceType, type StrategyInstance } from '@/stores/strategies'
 import { useRouter, useRoute } from 'vue-router'
+import DateInput from '@/components/DateInput.vue'
+import { parseToIso, todayIso } from '@/lib/dateFormat'
 
 const config = useConfigStore()
 const backtestStore = useBacktestStore()
@@ -19,7 +21,7 @@ const selectedInstance = computed<StrategyInstance | null>(() =>
 )
 
 const startDate = ref('2024-01-01')
-const endDate = ref(new Date().toISOString().split('T')[0])
+const endDate = ref(todayIso())
 const selectedSymbols = ref<string[]>(['BTCUSDT'])
 const riskPercent = ref(1)
 
@@ -55,8 +57,8 @@ function loadForm(): void {
     }
     const saved = JSON.parse(raw) as Record<string, unknown>
     if (typeof saved.selectedInstanceId === 'string') selectedInstanceId.value = saved.selectedInstanceId
-    if (typeof saved.startDate === 'string') startDate.value = saved.startDate
-    if (typeof saved.endDate === 'string') endDate.value = saved.endDate
+    if (typeof saved.startDate === 'string') startDate.value = parseToIso(saved.startDate) || saved.startDate
+    if (typeof saved.endDate === 'string') endDate.value = parseToIso(saved.endDate) || saved.endDate
     if (Array.isArray(saved.selectedSymbols) && saved.selectedSymbols.length) {
       selectedSymbols.value = saved.selectedSymbols.map(String)
     } else {
@@ -158,7 +160,7 @@ function formatParamValue(key: string, val: unknown): string {
       Pick any strategy — including Break &amp; Bounce — and run it with the params saved in Strategy Manager.
     </p>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
       <div class="card bg-base-200 border border-base-300">
         <div class="card-body p-4 space-y-4">
           <h2 class="card-title text-base">Select Strategy</h2>
@@ -200,21 +202,33 @@ function formatParamValue(key: string, val: unknown): string {
         </div>
       </div>
 
-      <div class="card bg-base-200 border border-base-300">
-        <div class="card-body p-4 space-y-4">
-          <h2 class="card-title text-base">Date Range</h2>
-          <label class="form-control">
-            <span class="label-text text-xs mb-1">Start Date</span>
-            <input type="date" class="input input-bordered" v-model="startDate" />
-          </label>
-          <label class="form-control">
-            <span class="label-text text-xs mb-1">End Date</span>
-            <input type="date" class="input input-bordered" v-model="endDate" />
-          </label>
-          <label class="form-control">
-            <span class="label-text text-xs mb-1">Risk % if stop-loss hits</span>
-            <input type="number" step="0.1" min="0.1" max="10" class="input input-bordered" v-model.number="riskPercent" />
-          </label>
+      <div class="card bg-base-200 border border-base-300 self-start">
+        <div class="card-body p-4 gap-2 space-y-0">
+          <div>
+            <h2 class="card-title text-base">Date Range</h2>
+            <p class="text-xs text-base-content/50 mt-0.5">Dates are day-first: <span class="font-mono">dd-mm-YYYY</span></p>
+          </div>
+          <div class="flex flex-wrap items-end gap-x-4 gap-y-3">
+            <label class="form-control w-auto">
+              <span class="label-text text-xs mb-1">Start Date</span>
+              <DateInput v-model="startDate" />
+            </label>
+            <label class="form-control w-auto">
+              <span class="label-text text-xs mb-1">End Date</span>
+              <DateInput v-model="endDate" />
+            </label>
+            <label class="form-control w-auto">
+              <span class="label-text text-xs mb-1">Risk % if stop-loss hits</span>
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="10"
+                class="input input-bordered w-24"
+                v-model.number="riskPercent"
+              />
+            </label>
+          </div>
           <div v-if="selectedInstance" class="alert text-xs py-2">
             <span>
               Defaults to <strong>BTCUSDT</strong> only. Your last selection is remembered when you leave this page.

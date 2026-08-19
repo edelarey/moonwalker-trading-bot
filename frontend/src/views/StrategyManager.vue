@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ALL_STRATEGY_TYPES, STRATEGY_TYPE_NAMES, type StrategyType } from '@/api/client'
 import TimeframeSelect from '@/components/TimeframeSelect.vue'
+import DateInput from '@/components/DateInput.vue'
 import { useStrategiesStore, instanceType, type StrategyInstance, type CreateInstancePayload, type UpdateInstancePayload } from '@/stores/strategies'
 import { useConfigStore } from '@/stores/config'
 
@@ -340,18 +341,19 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
           </div>
 
           <div v-if="backtestPanelId === inst.id" class="mt-2 pt-2 border-t border-base-300 space-y-2">
-            <div class="flex gap-2 flex-wrap">
-              <div class="form-control flex-1 min-w-[130px]">
+            <p class="text-xs text-base-content/50">Dates: <span class="font-mono">dd-mm-YYYY</span></p>
+            <div class="flex gap-2 flex-wrap items-end">
+              <div class="form-control w-auto">
                 <label class="label py-0"><span class="label-text text-xs">Start Date</span></label>
-                <input type="date" v-model="backtestStart" class="input input-bordered input-xs" />
+                <DateInput v-model="backtestStart" size="xs" />
               </div>
-              <div class="form-control flex-1 min-w-[130px]">
+              <div class="form-control w-auto">
                 <label class="label py-0"><span class="label-text text-xs">End Date</span></label>
-                <input type="date" v-model="backtestEnd" class="input input-bordered input-xs" />
+                <DateInput v-model="backtestEnd" size="xs" />
               </div>
-              <div class="form-control flex-1 min-w-[90px]">
+              <div class="form-control w-auto">
                 <label class="label py-0"><span class="label-text text-xs">Risk %</span></label>
-                <input type="number" step="0.1" min="0.1" max="10" v-model.number="backtestRisk" class="input input-bordered input-xs" />
+                <input type="number" step="0.1" min="0.1" max="10" v-model.number="backtestRisk" class="input input-bordered input-xs w-20" />
               </div>
             </div>
             <button

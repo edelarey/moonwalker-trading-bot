@@ -18,6 +18,7 @@ import {
 } from '../types';
 import { fetchCandles } from '../bybit/client';
 import { detectBullishPattern, detectBearishPattern } from '../strategy/candlePatterns';
+import { dayStartUtcMs, toIsoDate } from '../util/dates';
 import { buildReversalSignal, calcPositionSize } from '../strategy/riskManager';
 import { logger } from '../logger';
 
@@ -38,7 +39,7 @@ function groupByDay(candles: Candle[]): Map<string, Candle[]> {
 }
 
 function dateToMs(dateStr: string): number {
-  return new Date(dateStr + 'T00:00:00Z').getTime();
+  return dayStartUtcMs(dateStr);
 }
 
 function isInLiquidityWindow(openTimeMs: number, startHHMM: string, endHHMM: string): boolean {
@@ -195,6 +196,11 @@ function simulateDay(params: {
  * Run a full backtest for given params.
  */
 export async function runBacktest(params: BacktestParams): Promise<BacktestResult> {
+  params = {
+    ...params,
+    startDate: toIsoDate(params.startDate),
+    endDate: toIsoDate(params.endDate),
+  };
   logger.info('Starting backtest', { symbols: params.symbols, start: params.startDate, end: params.endDate });
 
   const startMs = dateToMs(params.startDate);
