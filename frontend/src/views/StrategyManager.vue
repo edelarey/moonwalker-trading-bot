@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ALL_STRATEGY_TYPES, type StrategyType } from '@/api/client'
+import { ALL_STRATEGY_TYPES, STRATEGY_TYPE_NAMES, type StrategyType } from '@/api/client'
 import { useStrategiesStore, instanceType, type StrategyInstance, type CreateInstancePayload, type UpdateInstancePayload } from '@/stores/strategies'
 import { useConfigStore } from '@/stores/config'
 
@@ -63,14 +63,21 @@ function toggleFormSymbol(sym: string) {
   else formSymbolsSelected.value.push(sym)
 }
 
+const paramsForType = ref<StrategyType | null>(null)
+
+function snapshotParams(): Record<string, any> {
+  return JSON.parse(JSON.stringify(formParams.value ?? {}))
+}
+
 function openCreate() {
   editingId.value = null
-  formName.value = ''
   formType.value = 'ema_pullback'
+  formName.value = STRATEGY_TYPE_NAMES[formType.value]
   formSymbolsSelected.value = []
   formEnabled.value = true
   formAutoMode.value = false
   formParams.value = {}
+  paramsForType.value = null
   modalOpen.value = true
   void onTypeChange()
 }
@@ -83,24 +90,37 @@ function openEdit(inst: StrategyInstance) {
   formEnabled.value = inst.enabled
   formAutoMode.value = inst.autoMode ?? false
   formParams.value = { ...(inst.params as Record<string, any>) }
+  paramsForType.value = instanceType(inst)
   modalOpen.value = true
 }
 
 function closeModal() { modalOpen.value = false }
 
 async function onTypeChange() {
-  const defaults = await store.fetchDefaults(formType.value)
+  const prev = paramsForType.value
+  const next = formType.value
+  if (!editingId.value) {
+    const prevLabel = prev ? STRATEGY_TYPE_NAMES[prev] : ''
+    if (!formName.value.trim() || formName.value === prevLabel) {
+      formName.value = STRATEGY_TYPE_NAMES[next]
+    }
+  }
+  if (paramsForType.value === next && Object.keys(formParams.value).length) return
+  const defaults = await store.fetchDefaults(next)
+  if (formType.value !== next) return
   if (defaults) formParams.value = { ...defaults }
+  paramsForType.value = next
 }
 
 async function saveModal() {
-  const symbols = formSymbolsSelected.value
+  const symbols = [...formSymbolsSelected.value]
+  const params = snapshotParams()
   if (editingId.value) {
     const payload: UpdateInstancePayload = {
       name: formName.value,
       strategyType: formType.value,
       symbols,
-      params: formParams.value,
+      params,
       enabled: formEnabled.value,
       autoMode: formAutoMode.value,
     }
@@ -110,13 +130,16 @@ async function saveModal() {
       name: formName.value,
       strategyType: formType.value,
       symbols,
-      params: formParams.value,
+      params,
       enabled: formEnabled.value,
       autoMode: formAutoMode.value,
     }
     await store.createInstance(payload)
   }
-  if (!store.error) closeModal()
+  if (!store.error) {
+    await store.fetchInstances()
+    closeModal()
+  }
 }
 
 const confirmDeleteId = ref<string | null>(null)
@@ -126,6 +149,27 @@ async function confirmDelete() {
     await store.deleteInstance(confirmDeleteId.value)
     confirmDeleteId.value = null
   }
+}
+
+const confirmResetId = ref<string | null>(null)
+function requestReset(id: string) { confirmResetId.value = id }
+async function confirmReset() {
+  if (!confirmResetId.value) return
+  const updated = await store.resetDefaults(confirmResetId.value)
+  if (updated && editingId.value === updated.id) {
+    formParams.value = { ...(updated.params as Record<string, any>) }
+    paramsForType.value = instanceType(updated)
+  }
+  confirmResetId.value = null
+}
+
+async function resetModalParams() {
+  if (editingId.value) {
+    requestReset(editingId.value)
+    return
+  }
+  const defaults = await store.fetchDefaults(formType.value)
+  if (defaults) formParams.value = { ...defaults }
 }
 
 async function toggleEnabled(inst: StrategyInstance) {
@@ -245,6 +289,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
 
           <div class="flex flex-wrap gap-1 mt-1">
             <button class="btn btn-xs btn-outline" @click="openEdit(inst)">Edit</button>
+            <button class="btn btn-xs btn-outline" @click="requestReset(inst.id)">Reset defaults</button>
             <button class="btn btn-xs" :class="inst.autoMode ? 'btn-success' : 'btn-outline'" @click="toggleAuto(inst)">
               {{ inst.autoMode ? 'Auto on' : 'Auto off' }}
             </button>
@@ -342,9 +387,15 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
           </div>
           <div class="form-control">
             <label class="label"><span class="label-text">Strategy Type</span></label>
-            <select v-model="formType" class="select select-bordered select-sm" @change="onTypeChange">
-              <option v-for="t in strategyTypes" :key="t" :value="t">{{ t }}</option>
+            <select
+              v-model="formType"
+              class="select select-bordered select-sm"
+              :disabled="!!editingId"
+              @change="onTypeChange"
+            >
+              <option v-for="t in strategyTypes" :key="t" :value="t">{{ STRATEGY_TYPE_NAMES[t] }}</option>
             </select>
+            <p v-if="editingId" class="text-xs text-base-content/50 mt-1">Type is locked on existing strategies so a dropdown click cannot wipe saved params.</p>
           </div>
           <div class="form-control">
             <label class="label">
@@ -381,9 +432,31 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
           <div class="border border-base-300 rounded-lg p-3 space-y-2">
             <div class="text-sm font-semibold text-base-content/70">Parameters</div>
 
-            <div v-if="formType === 'break_bounce'" class="text-xs text-base-content/60 italic">
-              Uses global timeframe config from Trading settings.
-            </div>
+            <template v-if="formType === 'break_bounce'">
+              <div class="grid grid-cols-2 gap-2">
+                <label class="form-control"><span class="label-text text-xs">Blueprint TF</span>
+                  <select v-model="formParams.primaryTimeframe" class="select select-bordered select-xs">
+                    <option value="D">Daily</option>
+                    <option value="W">Weekly</option>
+                    <option value="M">Monthly</option>
+                  </select>
+                </label>
+                <label class="form-control"><span class="label-text text-xs">Breakout TF</span>
+                  <select v-model="formParams.breakoutTimeframe" class="select select-bordered select-xs">
+                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
+                  </select>
+                </label>
+                <label class="form-control"><span class="label-text text-xs">Entry TF</span>
+                  <select v-model="formParams.entryTimeframe" class="select select-bordered select-xs">
+                    <option v-for="tf in timeframeOptions" :key="'e'+tf.value" :value="tf.value">{{ tf.label }}</option>
+                  </select>
+                </label>
+                <label class="form-control"><span class="label-text text-xs">TP multiplier</span><input type="number" step="0.1" v-model.number="formParams.tpMultiplier" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Buffer %</span><input type="number" step="0.01" v-model.number="formParams.breakoutBufferPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Window start UTC</span><input type="time" v-model="formParams.liquidityWindowStart" class="input input-bordered input-xs" /></label>
+                <label class="form-control col-span-2"><span class="label-text text-xs">Window end UTC</span><input type="time" v-model="formParams.liquidityWindowEnd" class="input input-bordered input-xs" /></label>
+              </div>
+            </template>
 
             <template v-if="formType === 'dca'">
               <div class="grid grid-cols-2 gap-2">
@@ -392,6 +465,8 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Max total USDT</span><input type="number" v-model.number="formParams.maxTotalInvestment" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Take profit %</span><input type="number" v-model.number="formParams.takeProfitPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Trailing stop %</span><input type="number" v-model.number="formParams.trailingStopPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">MA filter period</span><input type="number" v-model.number="formParams.maFilterPeriod" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">RSI filter max</span><input type="number" v-model.number="formParams.rsiFilterMax" class="input input-bordered input-xs" /></label>
               </div>
             </template>
 
@@ -401,6 +476,12 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Lower price (0=auto)</span><input type="number" v-model.number="formParams.lowerPrice" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Grid count</span><input type="number" v-model.number="formParams.gridCount" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">USDT / grid</span><input type="number" v-model.number="formParams.investmentPerGrid" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">SL breakout %</span><input type="number" step="0.1" v-model.number="formParams.stopLossBreakoutPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Leverage</span><input type="number" step="1" min="1" v-model.number="formParams.leverage" class="input input-bordered input-xs" /></label>
+                <label class="form-control col-span-2 label cursor-pointer">
+                  <span class="label-text text-xs">Geometric spacing</span>
+                  <input type="checkbox" v-model="formParams.geometric" class="toggle toggle-sm" />
+                </label>
               </div>
             </template>
 
@@ -410,6 +491,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Long period</span><input type="number" v-model.number="formParams.longPeriod" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">SL %</span><input type="number" v-model.number="formParams.stopLossPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">TP %</span><input type="number" v-model.number="formParams.takeProfitPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Trailing stop %</span><input type="number" v-model.number="formParams.trailingStopPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
                   <select v-model="formParams.timeframe" class="select select-bordered select-xs">
                     <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
@@ -425,6 +507,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Overbought</span><input type="number" v-model.number="formParams.overboughtThreshold" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">SL %</span><input type="number" v-model.number="formParams.stopLossPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">TP %</span><input type="number" v-model.number="formParams.takeProfitPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Confirm candles</span><input type="number" v-model.number="formParams.confirmationCandles" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Timeframe</span>
                   <select v-model="formParams.timeframe" class="select select-bordered select-xs">
                     <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
@@ -443,6 +526,11 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                     <option value="breakout">Breakout</option>
                   </select>
                 </label>
+                <label class="form-control"><span class="label-text text-xs">SL %</span><input type="number" step="0.1" v-model.number="formParams.stopLossPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">TP %</span><input type="number" step="0.1" v-model.number="formParams.takeProfitPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Trailing stop %</span><input type="number" step="0.1" v-model.number="formParams.trailingStopPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Volume confirm ×</span><input type="number" step="0.1" v-model.number="formParams.volumeConfirmMultiplier" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Squeeze width %</span><input type="number" step="0.1" v-model.number="formParams.squeezeThresholdPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Timeframe</span>
                   <select v-model="formParams.timeframe" class="select select-bordered select-xs">
                     <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
@@ -496,6 +584,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Deviation %</span><input type="number" v-model.number="formParams.deviationPercent" class="input input-bordered input-xs" step="0.05" /></label>
                 <label class="form-control"><span class="label-text text-xs">SL %</span><input type="number" v-model.number="formParams.stopLossPercent" class="input input-bordered input-xs" step="0.05" /></label>
                 <label class="form-control"><span class="label-text text-xs">TP %</span><input type="number" v-model.number="formParams.takeProfitPercent" class="input input-bordered input-xs" step="0.05" /></label>
+                <label class="form-control"><span class="label-text text-xs">Session reset hour UTC</span><input type="number" min="0" max="23" v-model.number="formParams.sessionResetHour" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Timeframe</span>
                   <select v-model="formParams.timeframe" class="select select-bordered select-xs">
                     <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
@@ -509,6 +598,8 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Range minutes</span><input type="number" v-model.number="formParams.rangeMinutes" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">TP R-multiple</span><input type="number" v-model.number="formParams.takeProfitRr" class="input input-bordered input-xs" step="0.1" /></label>
                 <label class="form-control"><span class="label-text text-xs">Buffer %</span><input type="number" v-model.number="formParams.breakoutBufferPercent" class="input input-bordered input-xs" step="0.01" /></label>
+                <label class="form-control"><span class="label-text text-xs">Session start hour UTC</span><input type="number" min="0" max="23" v-model.number="formParams.sessionStartHour" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Max trades / day</span><input type="number" min="1" v-model.number="formParams.maxTradesPerDay" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Timeframe</span>
                   <select v-model="formParams.timeframe" class="select select-bordered select-xs">
                     <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
@@ -580,7 +671,10 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
           </div>
         </div>
 
-        <div class="modal-action">
+        <div class="modal-action flex-wrap">
+          <button class="btn btn-ghost btn-sm mr-auto" type="button" :disabled="store.loading" @click="resetModalParams">
+            Reset to defaults
+          </button>
           <button class="btn btn-ghost btn-sm" @click="closeModal">Cancel</button>
           <button class="btn btn-primary btn-sm" :disabled="store.loading" @click="saveModal">
             <span v-if="store.loading" class="loading loading-spinner loading-xs"></span>
@@ -604,6 +698,23 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
         </div>
       </div>
       <div class="modal-backdrop" @click="confirmDeleteId = null"></div>
+    </div>
+
+    <div v-if="confirmResetId" class="modal modal-open">
+      <div class="modal-box max-w-sm">
+        <h3 class="font-bold text-lg">Reset to defaults</h3>
+        <p class="py-4 text-base-content/70">
+          Replace this strategy’s parameters with the factory starting values? Name, symbols, and On/Auto stay as they are.
+        </p>
+        <div class="modal-action">
+          <button class="btn btn-ghost btn-sm" @click="confirmResetId = null">Cancel</button>
+          <button class="btn btn-warning btn-sm" :disabled="store.loading" @click="confirmReset">
+            <span v-if="store.loading" class="loading loading-spinner loading-xs"></span>
+            <span v-else>Reset params</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-backdrop" @click="confirmResetId = null"></div>
     </div>
   </div>
 </template>

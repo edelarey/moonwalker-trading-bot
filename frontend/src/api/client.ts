@@ -31,6 +31,24 @@ export const ALL_STRATEGY_TYPES: StrategyType[] = [
   'funding_arb', 'cross_exchange', 'dynamic_delta', 'drawdown_hedge',
 ]
 
+export const STRATEGY_TYPE_NAMES: Record<StrategyType, string> = {
+  break_bounce: 'Break & Bounce',
+  dca: 'DCA',
+  grid: 'Grid',
+  ma_crossover: 'MA Crossover',
+  rsi: 'RSI',
+  bollinger: 'Bollinger',
+  donchian: 'Donchian Breakout',
+  ema_pullback: 'EMA Pullback',
+  supertrend: 'Supertrend',
+  vwap: 'VWAP Fade',
+  orb: 'Opening Range Breakout',
+  funding_arb: 'Funding Arb (delta-neutral)',
+  cross_exchange: 'Cross-Exchange Hedge',
+  dynamic_delta: 'Dynamic Delta Hedge',
+  drawdown_hedge: 'Drawdown Hedge',
+}
+
 export interface SymbolConfig { symbol: string; enabled: boolean; addedAt: number }
 export interface AppConfig {
   symbols: SymbolConfig[]

@@ -182,6 +182,24 @@ export const useStrategiesStore = defineStore('strategies', () => {
     }
   }
 
+  async function resetDefaults(id: string): Promise<StrategyInstance | null> {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await fetch(`${API_BASE}/api/strategies/${id}/reset-defaults`, { method: 'POST' })
+      if (!res.ok) throw new Error(`Failed to reset strategy: ${res.statusText}`)
+      const updated: StrategyInstance = await res.json()
+      const idx = instances.value.findIndex(i => i.id === id)
+      if (idx !== -1) instances.value[idx] = updated
+      return updated
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
   function addSignal(signal: StrategySignal): void {
     signals.value.unshift(signal)
     if (signals.value.length > 100) signals.value = signals.value.slice(0, 100)
@@ -215,6 +233,7 @@ export const useStrategiesStore = defineStore('strategies', () => {
     deleteInstance,
     runBacktest,
     fetchDefaults,
+    resetDefaults,
     addSignal,
     addBacktestResult,
     clearBacktestResults,

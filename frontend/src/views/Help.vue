@@ -6,7 +6,10 @@ const faqs = [
   { q: 'What does "clearly" mean for a breakout?', a: 'The breakout buffer (default 0.05%) means the close must be at least 0.05% beyond the level — not just touching it. This filters out false breakouts.' },
   { q: 'Can I change timeframes while the bot is running?', a: 'Yes, but you must restart the backend for WebSocket re-subscription to take effect. The config is saved immediately, but the live feeds use the timeframes from startup.' },
   { q: 'Why only trade during the liquidity window?', a: 'Crypto markets have higher volume and tighter spreads around the UTC midnight open. Trading outside this window risks poor fills, wider spreads, and choppy price action that generates false signals.' },
-  { q: 'What is the maximum number of active symbols?', a: 'You can add unlimited symbols to the list, but only 20 can be enabled (actively tracked) at a time. Inactive symbols are stored in the list but receive no WebSocket subscriptions and generate no signals.' },
+  { q: 'What is the maximum number of active symbols?', a: 'You can add unlimited symbols to the list, but only 50 can be enabled (actively tracked) at a time. Inactive symbols stay in the list but receive no WebSocket subscriptions and generate no signals.' },
+  { q: 'Did my strategy edits get saved?', a: 'Yes — Update writes params to strategy-instances.json. A backend restart no longer overwrites them. Use Reset defaults on a card (or in the editor) if you want the factory starting values back. Names do not include the word Default; they are just the strategy name.' },
+  { q: 'Why is Max Drawdown larger than my stop-loss %?', a: 'MaxDD is the largest peak-to-trough drop in account equity (USDT) across the backtest, not the per-trade stop. Consecutive losers add up. Risk % (default 1%) is how much equity one exact stop costs. This engine also fills exits at the candle close, which can overshoot the stop, and leftover open trades are marked at the last close.' },
+  { q: 'Do hedge strategies send live orders?', a: 'dynamic_delta and drawdown_hedge send a Bybit USDT-perp hedge. funding_arb live only shorts the perp (you must hold spot yourself). cross_exchange live only hedges on Bybit — no Binance order is sent. Paper simulates the full idea for all four.' },
 ]
 </script>
 
@@ -40,6 +43,46 @@ const faqs = [
             <span class="text-xl flex-shrink-0">4️⃣</span>
             <div><p class="font-semibold text-sm">Risk Management</p><p class="text-xs text-base-content/60 mt-0.5">Stop-loss is placed just beyond the reversal candle's extreme. Take-profit is 2.5× the risk distance (configurable). Only 1 trade per coin per period, only during the configured liquidity window.</p></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-200 border border-base-300">
+      <div class="card-body p-5 space-y-3">
+        <h2 class="text-lg font-bold">📚 All strategies</h2>
+        <p class="text-sm text-base-content/80">
+          Strategy Manager seeds one row per type. Edit parameters, then <strong>Reset defaults</strong> to restore the starting values. Names are just the strategy (no “Default” prefix).
+          Directional types open/close Bybit USDT perps in paper and live. Hedge types are paper-complete; live is often one-legged — see the table.
+        </p>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead><tr><th>Strategy</th><th>Type</th><th>Idea</th><th>Starting params</th></tr></thead>
+            <tbody>
+              <tr><td class="font-semibold text-sm">Break &amp; Bounce</td><td class="font-mono text-xs">break_bounce</td><td class="text-xs">Prev-period range → breakout close → retest → reversal candle</td><td class="text-xs font-mono">D / 15m / 5m, 0.08% buffer, UTC 00:00–04:00, 2.5R</td></tr>
+              <tr><td class="font-semibold text-sm">EMA Pullback</td><td class="font-mono text-xs">ema_pullback</td><td class="text-xs">9/21 trend; enter on a tap of the fast EMA</td><td class="text-xs font-mono">15m, 2% SL / 4% TP</td></tr>
+              <tr><td class="font-semibold text-sm">Supertrend</td><td class="font-mono text-xs">supertrend</td><td class="text-xs">ATR trailing band; trade flips</td><td class="text-xs font-mono">ATR 10 × 2 on 15m</td></tr>
+              <tr><td class="font-semibold text-sm">Donchian Breakout</td><td class="font-mono text-xs">donchian</td><td class="text-xs">20-bar channel break, ATR stops</td><td class="text-xs font-mono">4h, SL 2.5 ATR, TP 4 ATR</td></tr>
+              <tr><td class="font-semibold text-sm">VWAP Fade</td><td class="font-mono text-xs">vwap</td><td class="text-xs">Fade UTC-session VWAP extensions</td><td class="text-xs font-mono">5m, 0.6% band, 1.2% SL / 0.8% TP</td></tr>
+              <tr><td class="font-semibold text-sm">Opening Range Breakout</td><td class="font-mono text-xs">orb</td><td class="text-xs">First N minutes of the UTC day set the range</td><td class="text-xs font-mono">30m range, 2R, 1 trade/day</td></tr>
+              <tr><td class="font-semibold text-sm">RSI</td><td class="font-mono text-xs">rsi</td><td class="text-xs">Extreme mean-reversion</td><td class="text-xs font-mono">14 / 20 / 80, 2 confirms, 1h, 2.5% SL</td></tr>
+              <tr><td class="font-semibold text-sm">MA Crossover</td><td class="font-mono text-xs">ma_crossover</td><td class="text-xs">Fast/slow MA cross</td><td class="text-xs font-mono">20/50 on 4h, 3% SL / 8% TP</td></tr>
+              <tr><td class="font-semibold text-sm">Bollinger</td><td class="font-mono text-xs">bollinger</td><td class="text-xs">Band breakout + volume (or mean-reversion mode)</td><td class="text-xs font-mono">20 / 2σ, 4h, 3% SL / 6% TP</td></tr>
+              <tr><td class="font-semibold text-sm">DCA</td><td class="font-mono text-xs">dca</td><td class="text-xs">Timed buys with TP / trail</td><td class="text-xs font-mono">$50 / 24h, $500 cap, 15% TP</td></tr>
+              <tr><td class="font-semibold text-sm">Grid</td><td class="font-mono text-xs">grid</td><td class="text-xs">Geometric grid inside a range</td><td class="text-xs font-mono">12 levels, 4% range-break stop</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Hedging / funding — read before Auto</p>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead><tr><th>Strategy</th><th>Paper</th><th>Live Bybit perp</th><th>Not implemented</th></tr></thead>
+            <tbody>
+              <tr><td class="font-semibold text-sm">Funding Arb</td><td class="text-xs">Virtual spot + short perp; funding credited</td><td class="text-xs">Short perp only — hold spot yourself</td><td class="text-xs">Bybit spot orders</td></tr>
+              <tr><td class="font-semibold text-sm">Cross-Exchange Hedge</td><td class="text-xs">Binance last is a price reference; hedge on Bybit</td><td class="text-xs">Bybit perp only — no Binance order</td><td class="text-xs">Second exchange</td></tr>
+              <tr><td class="font-semibold text-sm">Dynamic Delta Hedge</td><td class="text-xs">Hedges when |delta| or ATR% is high</td><td class="text-xs">Bybit perp (default BTCUSDT)</td><td class="text-xs">Options, per-name delta</td></tr>
+              <tr><td class="font-semibold text-sm">Drawdown Hedge</td><td class="text-xs">Shorts after a paper-equity drop</td><td class="text-xs">Bybit perp; does not sell coins to stables</td><td class="text-xs">USDT conversion, puts</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -113,26 +156,27 @@ const faqs = [
           <li>Watch Positions: a signal should open a paper fill, then SL/TP close it on later candles.</li>
           <li>Compare with a historical backtest on the same params before considering Live.</li>
         </ol>
-        <p class="text-xs text-base-content/60">Paper fills use the last close plus configured fee and slippage. If a candle tags both SL and TP, the stop is filled (conservative).</p>
+        <p class="text-xs text-base-content/60">Paper fills use the last close plus configured fee and slippage (defaults 6 bps / 3 bps). If a candle tags both SL and TP, the stop is filled (conservative). Settings can reset the paper account (keeps history) or clear trade / backtest history.</p>
       </div>
     </details>
 
     <details class="group bg-base-200 border border-base-300 rounded-xl overflow-hidden">
       <summary class="flex items-center justify-between px-5 py-4 cursor-pointer font-semibold text-base select-none list-none hover:bg-base-300 transition-colors">
-        <span>🤖 Extra strategies</span>
+        <span>🤖 Extra strategies (detail)</span>
         <span class="text-lg transition-transform duration-200 group-open:rotate-180">▼</span>
       </summary>
       <div class="px-5 pb-5 pt-3 border-t border-base-300 overflow-x-auto">
+        <p class="text-sm text-base-content/70 mb-3">The full list is at the top of this page. Notes that are easy to miss:</p>
         <table class="table table-sm">
           <thead><tr><th>Type</th><th>Idea</th></tr></thead>
           <tbody>
-            <tr><td class="font-mono text-xs">donchian</td><td class="text-xs">Turtle-style channel breakout with ATR stops. Trend-following edge on crypto (Donchian ensembles have published alpha vs BTC).</td></tr>
+            <tr><td class="font-mono text-xs">donchian</td><td class="text-xs">Stops are ATR multiples, not a %. The backtest also exits if price closes back through the channel, which can be past the ATR stop.</td></tr>
             <tr><td class="font-mono text-xs">ema_pullback</td><td class="text-xs">9/21 EMA trend; enter when price tags the fast EMA and closes back with the trend. Less noisy than a raw crossover.</td></tr>
             <tr><td class="font-mono text-xs">supertrend</td><td class="text-xs">ATR trailing band. Stay in the move until the band flips.</td></tr>
-            <tr><td class="font-mono text-xs">vwap</td><td class="text-xs">Fade extensions away from the UTC-session VWAP; target is VWAP itself.</td></tr>
+            <tr><td class="font-mono text-xs">vwap</td><td class="text-xs">Fade extensions away from the UTC-session VWAP; target is VWAP itself. Tight SL makes notional large when sizing by risk %.</td></tr>
             <tr><td class="font-mono text-xs">orb</td><td class="text-xs">First N minutes after UTC midnight set a range; trade the first close beyond it.</td></tr>
-            <tr><td class="font-mono text-xs">funding_arb</td><td class="text-xs">Delta-neutral funding harvest: virtual spot + short perp when 8h funding is rich. Paper credits funding; live only shorts the perp.</td></tr>
-            <tr><td class="font-mono text-xs">cross_exchange</td><td class="text-xs">Fade Bybit vs Binance when the gap is wide; cover when it snaps back. Backtest uses Bybit perp vs spot.</td></tr>
+            <tr><td class="font-mono text-xs">funding_arb</td><td class="text-xs">Paper: virtual spot + short perp when 8h funding is rich. Live only shorts the perp.</td></tr>
+            <tr><td class="font-mono text-xs">cross_exchange</td><td class="text-xs">Fade Bybit vs Binance (public ticker). Live hedge is Bybit only. Backtest uses Bybit perp vs spot.</td></tr>
             <tr><td class="font-mono text-xs">dynamic_delta</td><td class="text-xs">Hedge net long inventory when |delta|/equity or ATR% exceeds a trigger.</td></tr>
             <tr><td class="font-mono text-xs">drawdown_hedge</td><td class="text-xs">After a peak-to-trough equity drop, short a portion; cover when drawdown shrinks.</td></tr>
           </tbody>
@@ -174,12 +218,12 @@ const faqs = [
       <div class="px-5 pb-5 pt-3 border-t border-base-300 space-y-4">
         <ol class="list-decimal list-inside space-y-1 text-sm text-base-content/80">
           <li>Go to <strong>Backtest</strong> in the sidebar</li>
-          <li>Select a date range (e.g. 2024-01-01 → 2024-12-31)</li>
-          <li>Select one or more coins to test</li>
-          <li>Configure the timeframes and risk parameters for the test</li>
-          <li>Click <strong>▶ Run Backtest</strong></li>
-          <li>Results appear automatically in <strong>BT Results</strong></li>
-          <li>Export to CSV for detailed analysis</li>
+          <li>Pick <strong>Strategy Instance</strong> (uses saved params) or <strong>Break &amp; Bounce (Global)</strong></li>
+          <li>Select a date range. Risk % is how much equity one exact stop costs (default 1%)</li>
+          <li>Only <strong>BTCUSDT</strong> is selected by default. Your last coins, dates, and risk are remembered in the browser</li>
+          <li>Strategy params are read-only here — edit them in Strategy Manager</li>
+          <li>Click <strong>▶ Run Backtest</strong>. Results open at <strong>BT Results</strong> (same page as Strategy Results)</li>
+          <li>PnL is ending equity − start (default $10,000). MaxDD is the worst peak-to-trough on the closed-trade book, in USDT</li>
         </ol>
         <div class="overflow-x-auto">
           <table class="table table-sm">
@@ -262,7 +306,11 @@ const faqs = [
         <span class="text-lg transition-transform duration-200 group-open:rotate-180">▼</span>
       </summary>
       <div class="px-5 pb-5 pt-3 border-t border-base-300 space-y-4">
-        <p class="text-sm text-base-content/70">The Strategy Manager is your strategy library. Define, name, and configure strategies here — each starts from sensible default parameters which you can tweak and save. Once saved, a strategy can be deployed to <strong>Live Trading</strong> to run against the live market, or sent to <strong>Backtest</strong> to evaluate against historical data. You can build up a library of strategies running in parallel.</p>
+        <p class="text-sm text-base-content/70">
+          Strategy Manager is the library. One row is seeded per type (Break &amp; Bounce, EMA Pullback, VWAP Fade, the four hedges, and the rest).
+          Edit and <strong>Update</strong> — params persist across restarts. <strong>Reset defaults</strong> on the card or in the editor restores factory starting params only (name, coins, and On/Auto are kept).
+          Type is locked when you edit an existing row so a dropdown click cannot wipe params. Deploy paper/live from the card, or send the instance to Backtest.
+        </p>
 
         <!-- DCA -->
         <details class="group/inner bg-base-300 border border-base-300 rounded-lg overflow-hidden">

@@ -14,16 +14,15 @@ const navItems = [
   { path: '/trading', icon: '⚡', label: 'Trading' },
   { path: '/positions', icon: '📋', label: 'Positions' },
   { path: '/backtest', icon: '🧪', label: 'Backtest' },
-  { path: '/backtest/results', icon: '📈', label: 'BT Results' },
+  { path: '/backtest/results', icon: '📈', label: 'Results' },
   { path: '/strategies', icon: '🤖', label: 'Strategy Manager' },
-  { path: '/strategies/results', icon: '🏆', label: 'Results' },
   { path: '/settings', icon: '⚙️', label: 'Settings' },
   { path: '/help', icon: '❓', label: 'Help' },
 ]
 </script>
 
 <template>
-  <aside class="w-16 lg:w-56 flex flex-col bg-base-200 border-r border-base-300 min-h-screen">
+  <aside class="sticky top-0 z-30 flex h-screen w-16 shrink-0 flex-col overflow-y-auto border-r border-base-300 bg-base-200 lg:w-56">
     <!-- Logo -->
     <div class="p-3 lg:p-4 border-b border-base-300">
       <div class="flex items-center gap-2">

@@ -158,7 +158,7 @@ async function run() {
           maxDrawdown: result.maxDrawdown ?? result.summary?.maxDrawdown ?? 0,
         },
       )
-      router.push('/strategies/results')
+      router.push('/backtest/results')
     } else {
       strategyError.value = strategiesStore.error ?? 'Backtest failed'
     }

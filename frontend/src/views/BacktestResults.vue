@@ -21,7 +21,15 @@ function selectResult(id: string) {
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <h1 class="text-2xl font-bold">Backtest Results</h1>
+      <div>
+        <h1 class="text-2xl font-bold">Backtest Results</h1>
+        <p v-if="result" class="text-sm text-base-content/60 mt-0.5">
+          {{ result.instanceName || 'Break & Bounce' }}
+          · {{ result.params.symbols.join(', ') }}
+          · {{ result.params.startDate }} → {{ result.params.endDate }}
+          · PnL is profit vs $ {{ result.summary.startingEquity.toFixed(0) }} start, not the closing balance
+        </p>
+      </div>
       <div class="flex gap-2">
         <button v-if="result" class="btn btn-sm btn-outline" @click="backtestApi.exportCsv(result!.id)">
           Export CSV
@@ -84,7 +92,7 @@ function selectResult(id: string) {
           <div class="overflow-x-auto max-h-96">
             <table class="table table-sm">
               <thead class="sticky top-0 bg-base-200"><tr>
-                <th>Symbol</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>PnL</th><th>Status</th><th>Time</th>
+                <th>Symbol</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>PnL</th><th>Strategy</th><th>Status</th><th>Time</th>
               </tr></thead>
               <tbody>
                 <TradeRow v-for="t in result.trades" :key="t.id" :trade="t" />

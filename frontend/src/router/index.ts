@@ -16,10 +16,10 @@ const router = createRouter({
     { path: '/positions', component: Positions, meta: { title: 'Positions' } },
     { path: '/backtest', component: Backtest, meta: { title: 'Backtest' } },
     { path: '/backtest/results', component: BacktestResults, meta: { title: 'Backtest Results' } },
+    { path: '/strategies/results', redirect: '/backtest/results' },
     { path: '/settings', component: Settings, meta: { title: 'Settings' } },
     { path: '/help', component: () => import('@/views/Help.vue'), meta: { title: 'Help' } },
     { path: '/strategies', component: () => import('@/views/StrategyManager.vue'), meta: { title: 'Strategy Manager' } },
-    { path: '/strategies/results', component: () => import('@/views/StrategyResults.vue'), meta: { title: 'Strategy Results' } },
   ],
 })
 

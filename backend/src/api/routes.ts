@@ -10,7 +10,7 @@ import { ALL_STRATEGY_TYPES, BacktestParams, MAX_ENABLED_SYMBOLS, StrategyInstan
 import { clearStoredKeys, getApiKeyStatus, hasApiKeys, saveStoredKeys } from '../security/secrets';
 import { Parser } from 'json2csv';
 import { strategyRegistry } from '../strategy/registry';
-import { getStrategyInstances, saveStrategyInstance, deleteStrategyInstance } from '../storage/strategyStore';
+import { getStrategyInstances, saveStrategyInstance, deleteStrategyInstance, resetStrategyParams, factoryParamsFor } from '../storage/strategyStore';
 import { activateStrategy, deactivateStrategy, syncEngineSymbols, syncSubscriptions } from '../strategy/runtime';
 import { paperBroker } from '../execution/paperBroker';
 import { v4 as uuidv4 } from 'uuid';
@@ -306,12 +306,8 @@ router.get('/strategies/defaults/:type', (req: Request, res: Response) => {
   if (!ALL_STRATEGY_TYPES.includes(type)) {
     return res.status(404).json({ error: `Unknown strategy type: ${type}` }) as any;
   }
-  const config = loadConfig();
-  if (config.strategyDefaults && config.strategyDefaults[type]) {
-    return res.json(config.strategyDefaults[type]) as any;
-  }
   try {
-    res.json(strategyRegistry.getDefaultParams(type));
+    res.json(factoryParamsFor(type));
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -341,6 +337,13 @@ router.delete('/strategies/:id', (req: Request, res: Response) => {
   deactivateStrategy(req.params.id);
   deleteStrategyInstance(req.params.id);
   res.json({ ok: true });
+});
+
+router.post('/strategies/:id/reset-defaults', async (req: Request, res: Response) => {
+  const saved = resetStrategyParams(req.params.id);
+  if (!saved) return res.status(404).json({ error: 'Not found' }) as any;
+  await activateStrategy(saved);
+  res.json(saved);
 });
 
 router.post('/strategies/:id/backtest', async (req: Request, res: Response) => {

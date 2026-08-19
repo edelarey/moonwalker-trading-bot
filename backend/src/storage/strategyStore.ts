@@ -9,23 +9,32 @@ import { normalizeInstance } from '../strategy/params';
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
 
-const TYPE_NAMES: Record<StrategyType, string> = {
-  break_bounce: 'Default Break & Bounce',
-  dca: 'Default DCA',
-  grid: 'Default Grid',
-  ma_crossover: 'Default MA Crossover',
-  rsi: 'Default RSI',
-  bollinger: 'Default Bollinger',
-  donchian: 'Default Donchian Breakout',
-  ema_pullback: 'Default EMA Pullback',
-  supertrend: 'Default Supertrend',
-  vwap: 'Default VWAP Fade',
-  orb: 'Default Opening Range Breakout',
-  funding_arb: 'Default Funding Arb (delta-neutral)',
-  cross_exchange: 'Default Cross-Exchange Hedge',
-  dynamic_delta: 'Default Dynamic Delta Hedge',
-  drawdown_hedge: 'Default Drawdown Hedge',
+export const TYPE_NAMES: Record<StrategyType, string> = {
+  break_bounce: 'Break & Bounce',
+  dca: 'DCA',
+  grid: 'Grid',
+  ma_crossover: 'MA Crossover',
+  rsi: 'RSI',
+  bollinger: 'Bollinger',
+  donchian: 'Donchian Breakout',
+  ema_pullback: 'EMA Pullback',
+  supertrend: 'Supertrend',
+  vwap: 'VWAP Fade',
+  orb: 'Opening Range Breakout',
+  funding_arb: 'Funding Arb (delta-neutral)',
+  cross_exchange: 'Cross-Exchange Hedge',
+  dynamic_delta: 'Dynamic Delta Hedge',
+  drawdown_hedge: 'Drawdown Hedge',
 };
+
+export function factoryParamsFor(type: StrategyType): Record<string, unknown> {
+  const config = loadConfig();
+  const fromConfig = config.strategyDefaults?.[type];
+  if (fromConfig && typeof fromConfig === 'object') {
+    return { ...(fromConfig as Record<string, unknown>) };
+  }
+  return strategyRegistry.getDefaultParams(type);
+}
 
 function ensureDir(): void {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -69,32 +78,41 @@ export function deleteStrategyInstance(id: string): void {
   logger.debug('Strategy instance deleted', { id });
 }
 
+export function resetStrategyParams(id: string): StrategyInstance | null {
+  const existing = getStrategyInstances().find(s => s.id === id);
+  if (!existing) return null;
+  saveStrategyInstance({
+    ...existing,
+    params: factoryParamsFor(existing.strategyType),
+    updatedAt: Date.now(),
+  });
+  return getStrategyInstances().find(s => s.id === id) ?? null;
+}
+
 export async function seedDefaultStrategies(): Promise<void> {
   const existing = getStrategyInstances();
   const have = new Set(existing.map(s => s.strategyType));
-  const config = loadConfig();
-  const defaults = config.strategyDefaults ?? {};
   let added = 0;
-  let refreshed = 0;
+  let renamed = 0;
 
+  // Drop the old "Default " prefix from seeded names. Do not change custom names
+  // that do not start with that prefix. Never rewrite params here.
   for (const inst of existing) {
-    if (inst.name !== TYPE_NAMES[inst.strategyType]) continue;
-    const next = (defaults[inst.strategyType] as Record<string, unknown> | undefined)
-      ?? strategyRegistry.getDefaultParams(inst.strategyType);
-    saveStrategyInstance({ ...inst, params: next, updatedAt: Date.now() });
-    refreshed++;
+    if (!inst.name.startsWith('Default ')) continue;
+    const nextName = inst.name.replace(/^Default\s+/, '');
+    if (!nextName || nextName === inst.name) continue;
+    saveStrategyInstance({ ...inst, name: nextName, updatedAt: Date.now() });
+    renamed++;
   }
 
   for (const type of ALL_STRATEGY_TYPES) {
     if (have.has(type)) continue;
-    const params = (defaults[type] as Record<string, unknown> | undefined)
-      ?? strategyRegistry.getDefaultParams(type);
     const inst: StrategyInstance = {
       id: uuidv4(),
       name: TYPE_NAMES[type],
       strategyType: type,
       symbols: [],
-      params,
+      params: factoryParamsFor(type),
       enabled: false,
       autoMode: false,
       createdAt: Date.now(),
@@ -104,7 +122,7 @@ export async function seedDefaultStrategies(): Promise<void> {
     added++;
   }
 
-  if (added > 0 || refreshed > 0) {
-    logger.info('seedDefaultStrategies: synced factory defaults', { added, refreshed });
+  if (added > 0 || renamed > 0) {
+    logger.info('seedDefaultStrategies', { added, renamed });
   }
 }

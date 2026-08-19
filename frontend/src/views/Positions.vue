@@ -145,8 +145,7 @@ async function clearHistory() {
           </table>
           <p v-else class="text-center text-base-content/40 py-4 text-sm">
             No paper or live fills yet. History is only written when <strong>Auto</strong> is on and a signal fills.
-            Backtests do not appear here — open <router-link to="/backtest/results" class="link">BT Results</router-link>
-            or <router-link to="/strategies/results" class="link">Strategy Results</router-link>.
+            Backtests do not appear here — open <router-link to="/backtest/results" class="link">Results</router-link>.
           </p>
         </div>
       </div>

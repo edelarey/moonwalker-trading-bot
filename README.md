@@ -11,8 +11,9 @@ A Vue + Node app for testing and running multiple strategies on **Bybit USDT per
 - **Paper broker** (default) — fills at last close plus fee/slippage; SL/TP close on later candles. Never calls Bybit order APIs.
 - **Live mode** — same signals, real market orders. Requires locally stored API keys.
 - **Several strategies at once** — each with its own Auto toggle and coin list. Directional perps are fully tradeable; hedge/funding types are paper-complete but only **partially** live (see below).
+- **Strategy Manager** — edit params, **Reset defaults** per row, names without a “Default” prefix. Saves persist across backend restarts.
 - **Top 50 Bybit USDT perps** in Coin Scanner (up to 50 active).
-- **Trade history** kept in `backend/data/trades.json` (paper reset does not wipe it).
+- **Trade history** kept in `backend/data/trades.json` (paper-account reset does not wipe it; Settings can clear history separately).
 - **Keys stay on this machine** — encrypted `backend/data/secrets.json`, gitignored.
 
 Frontend: **http://localhost:5180**  
@@ -22,7 +23,7 @@ Backend: **http://localhost:3001**
 
 ## Strategies
 
-Crypto-perp starting defaults (not claimed optimal). Factory “Default …” instances use these.
+Crypto-perp starting defaults (not claimed optimal). Strategy Manager seeds one named row per type (Break & Bounce, EMA Pullback, … — no “Default” in the name). Edit freely; **Reset defaults** on that row restores these starting values without changing the name, coins, or On/Auto.
 
 **Tradeable** here means the bot can send a real Bybit USDT-perp order that implements the idea. This app only trades **Bybit linear perps**. It does not place Bybit spot, Binance, or options orders.
 
@@ -65,6 +66,20 @@ Hedge defaults:
 | `cross_exchange` | 5m, enter 0.04% gap, exit 0.015%, stop 0.2%, max hold 60m |
 | `dynamic_delta` | 15m, hedge `BTCUSDT` if \|delta\| ≥ 8% equity or ATR% ≥ 1.2, hedge 50% |
 | `drawdown_hedge` | 15m, short after 3% peak-to-trough, cover at 1.2%, 50% via `BTCUSDT` |
+
+### Strategy Manager
+
+- **Edit** opens the param form for that type (including Break & Bounce timeframes/windows, Bollinger SL/TP, hedge knobs).
+- **Reset defaults** writes factory params back to that instance only. Confirm first. Name, symbols, enabled, and Auto are left alone.
+- Type is locked on an existing row so changing the dropdown cannot wipe saved params. Create a new row if you want a different type.
+- Backend boot **adds missing types** only. It does not overwrite params you saved.
+- Position size is global (Settings): `risk_percent` (default 1% of equity if the stop is hit exactly) or `fixed_usdt`.
+
+### Backtests
+
+- **Backtest** page: Strategy Instance (saved params) or Break & Bounce (Global). Only **BTCUSDT** is selected until you add coins. Dates, coins, and risk % are remembered in the browser.
+- PnL is ending equity − start (default **$10,000**). **MaxDD** is the worst peak-to-trough on the closed-trade book in USDT — not the per-trade stop %. Signal backtests exit at **candle close**, which can overshoot the stop; leftover opens are marked at the last close.
+- Results live at **BT Results** (`/backtest/results`). `/strategies/results` redirects there.
 
 ---
 
@@ -192,12 +207,11 @@ Strategy-specific params are edited per instance in Strategy Manager.
 | **Coin Scanner** | Top 50 Bybit USDT perps by 24h turnover; enable up to 50; add others manually |
 | **Trading** | Paper/Live switch, Break & Bounce AUTO + risk, **all strategies** with On / Auto / coin chips |
 | **Positions** | Open book + full history (filter paper/live, coin, strategy); CSV export |
-| **Backtest** | Historical run for Break & Bounce or a strategy instance |
-| **BT Results** | Summary metrics, equity curve, trade list |
-| **Strategy Manager** | Create/edit/delete instances, deploy paper, run backtests |
-| **Results** | Last per-strategy backtest snapshot |
-| **Settings** | Mode switch, paper account reset, **sub-account keys**, storage |
-| **Help** | Strategy notes, paper workflow, extra strategy descriptions |
+| **Backtest** | Historical run for a strategy instance or global Break & Bounce; BTCUSDT default; form remembered |
+| **BT Results** | Summary metrics (incl. MaxDD USDT and %), equity curve, trade list |
+| **Strategy Manager** | Create/edit/reset-defaults/delete instances, deploy paper, run backtests |
+| **Settings** | Mode switch, paper reset, clear trade/backtest history, **sub-account keys**, risk % / sizing |
+| **Help** | Full strategy catalog, hedge tradeability, paper workflow, FAQ |
 
 ---
 
@@ -258,8 +272,10 @@ Signals (Break & Bounce reversals and registry `entry`/`exit`) go through `execu
 | GET/POST | `/api/paper/account`, `/api/paper/reset` | Paper account |
 | POST/GET | `/api/backtest/run`, `/api/backtest/results` | B&B backtest |
 | GET/POST/PUT/DELETE | `/api/strategies` | Strategy instances |
-| GET | `/api/strategies/defaults/:type` | Starting params for a type |
+| GET | `/api/strategies/defaults/:type` | Factory starting params for a type |
+| POST | `/api/strategies/:id/reset-defaults` | Restore factory params (keeps name/coins/On/Auto) |
 | POST | `/api/strategies/:id/backtest` | Instance backtest |
+| DELETE | `/api/trades` / `/api/backtest/results` | Clear history (see Settings) |
 
 ### WebSocket (`ws://localhost:3001/ws`, proxied as `/ws` on 5180)
 

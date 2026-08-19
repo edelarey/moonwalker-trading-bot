@@ -32,7 +32,7 @@ const { connected } = useWebSocket((msg) => {
 <template>
   <div class="flex h-full min-h-screen bg-base-100">
     <AppNav :connected="connected" />
-    <main class="flex-1 overflow-y-auto p-4 lg:p-6">
+    <main class="relative z-0 min-w-0 flex-1 overflow-y-auto p-4 lg:p-6">
       <router-view />
     </main>
   </div>
