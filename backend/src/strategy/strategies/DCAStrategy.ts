@@ -95,7 +95,7 @@ export class DCAStrategy implements IStrategy {
   }
 
   async backtest(params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
-    const { fetchCandles } = await import('../../bybit/client');
+    const { fetchCandlesRange } = await import('../../bybit/client');
     const startMs = new Date(params.startDate + 'T00:00:00Z').getTime();
     const endMs = new Date(params.endDate + 'T00:00:00Z').getTime() + 86400000;
     const p = params.params as unknown as DCAParams;
@@ -104,11 +104,16 @@ export class DCAStrategy implements IStrategy {
     const equityCurve: Array<{ time: number; equity: number }> = [{ time: startMs, equity }];
 
     for (const symbol of params.symbols) {
-      const candles = await fetchCandles(symbol, 'D', 1000, startMs, endMs);
+      const candles = await fetchCandlesRange(symbol, 'D', startMs, endMs);
       const tempStrategy = new DCAStrategy({ ...this.instance, params: params.params });
+      let lastEntry = 0;
+      let lastCandle = candles[0];
       for (const c of candles) {
+        lastCandle = c;
         const signal = tempStrategy.onCandle(symbol, c, 'D');
+        if (signal?.type === 'entry') lastEntry = signal.price;
         if (signal?.type === 'exit') {
+          lastEntry = 0;
           const qty = (params.startingEquity / params.symbols.length) / (signal.price * 1.1);
           const pnl = (signal.price - (signal.price / (1 + p.takeProfitPercent / 100))) * qty;
           trades.push({
@@ -124,6 +129,22 @@ export class DCAStrategy implements IStrategy {
           equity += pnl;
           equityCurve.push({ time: c.openTime, equity });
         }
+      }
+      if (lastEntry > 0 && lastCandle) {
+        const qty = p.investmentAmount / lastEntry;
+        const pnl = (lastCandle.close - lastEntry) * qty;
+        trades.push({
+          id: uuidv4(), symbol, direction: 'bullish',
+          entryPrice: lastEntry, closePrice: lastCandle.close, pnl,
+          pnlPercent: lastEntry ? (pnl / lastEntry / qty) * 100 : 0,
+          stopLoss: 0, takeProfit: lastEntry * (1 + p.takeProfitPercent / 100), riskDistance: 0,
+          riskPercent: params.riskPercent, positionSize: p.investmentAmount,
+          qty, openedAt: lastCandle.openTime, closedAt: lastCandle.openTime,
+          status: pnl > 0 ? 'closed_tp' : 'closed_sl', isBacktest: true, patternType: 'dca' as any,
+          dailyHigh: lastCandle.high, dailyLow: lastCandle.low,
+        });
+        equity += pnl;
+        equityCurve.push({ time: lastCandle.openTime, equity });
       }
     }
     return { strategyType: 'dca', instanceName: this.instance.name, trades, summary: calcSummary(trades, params.startingEquity, equity), equityCurve };

@@ -10,7 +10,7 @@ A Vue + Node app for testing and running multiple strategies on **Bybit USDT per
 
 - **Paper broker** (default) — fills at last close plus fee/slippage; SL/TP close on later candles. Never calls Bybit order APIs.
 - **Live mode** — same signals, real market orders. Requires locally stored API keys.
-- **Several strategies at once** — each with its own Auto toggle and coin list.
+- **Several strategies at once** — each with its own Auto toggle and coin list. Directional perps are fully tradeable; hedge/funding types are paper-complete but only **partially** live (see below).
 - **Top 50 Bybit USDT perps** in Coin Scanner (up to 50 active).
 - **Trade history** kept in `backend/data/trades.json` (paper reset does not wipe it).
 - **Keys stay on this machine** — encrypted `backend/data/secrets.json`, gitignored.
@@ -23,6 +23,12 @@ Backend: **http://localhost:3001**
 ## Strategies
 
 Crypto-perp starting defaults (not claimed optimal). Factory “Default …” instances use these.
+
+**Tradeable** here means the bot can send a real Bybit USDT-perp order that implements the idea. This app only trades **Bybit linear perps**. It does not place Bybit spot, Binance, or options orders.
+
+### Directional (fully tradeable)
+
+Paper and live both open/close Bybit perps (live needs keys + `LIVE`).
 
 | Type | Idea | Starting defaults |
 |------|------|-------------------|
@@ -39,6 +45,26 @@ Crypto-perp starting defaults (not claimed optimal). Factory “Default …” i
 | `grid` | Geometric grid inside a range | 12 levels, set upper/lower per coin |
 
 Break & Bounce still uses the dedicated engine (blueprint → breakout close → retest → hammer / engulfing / shooting star). Other types go through the strategy registry.
+
+### Hedging / funding (read this before turning Auto on)
+
+| Type | Idea | Paper | Live Bybit perp | Not implemented |
+|------|------|-------|-----------------|-----------------|
+| `funding_arb` | Collect positive funding: long spot + short the same perp | **Yes** — virtual spot + short perp; funding is credited on the paper book | **Partial** — only the **short perp**. You must hold spot yourself. Not a complete live arb. | Bybit **spot** orders; automatic two-leg live |
+| `cross_exchange` | Inventory/dislocation hedge: fade Bybit vs a more liquid book | **Yes** — Binance USDT-M last is a public **price reference** (no Binance keys). Hedge fills on Bybit. Backtest uses Bybit perp vs Bybit spot. | **Partial** — hedge is a Bybit perp only. **No order is sent to Binance.** | A second exchange, inventory fills on a thin venue |
+| `dynamic_delta` | Scale a short hedge when \|net book delta\|/equity or ATR% exceeds a trigger | **Yes** — reads open paper trades; backtest assumes a standing long bag | **Yes** — hedge is a Bybit perp (default `BTCUSDT`). Useful only if you already have directional size. | Options, per-name delta, auto rebalance of every coin |
+| `drawdown_hedge` | After a peak-to-trough equity drop, short a portion; cover on recovery | **Yes** — uses paper equity peak | **Yes** — hedge is a Bybit perp. Does not sell coins into stables. | Converting holdings to USDT/USDC, options puts |
+
+**Do not treat `funding_arb` or `cross_exchange` as live “set and forget”.** On live they are one-legged Bybit shorts. Full delta-neutral funding and true cross-exchange hedging need spot and/or another venue, which this bot does not trade.
+
+Hedge defaults:
+
+| Type | Starting defaults |
+|------|-------------------|
+| `funding_arb` | 1h, enter 8h funding ≥ 0.01%, exit ≤ 0.003%, max basis 0.2% |
+| `cross_exchange` | 5m, enter 0.04% gap, exit 0.015%, stop 0.2%, max hold 60m |
+| `dynamic_delta` | 15m, hedge `BTCUSDT` if \|delta\| ≥ 8% equity or ATR% ≥ 1.2, hedge 50% |
+| `drawdown_hedge` | 15m, short after 3% peak-to-trough, cover at 1.2%, 50% via `BTCUSDT` |
 
 ---
 

@@ -171,6 +171,13 @@ router.delete('/keys', (_req: Request, res: Response) => {
   res.json(getApiKeyStatus());
 });
 
+router.delete('/trades', (_req: Request, res: Response) => {
+  store.clearTrades();
+  const account = paperBroker.wipeAfterHistoryClear();
+  logger.info('Trade history cleared');
+  res.json({ ok: true, account });
+});
+
 router.get('/trades/export-csv', (_req: Request, res: Response) => {
   const trades = store.getTrades();
   const fields = ['id', 'symbol', 'direction', 'entryPrice', 'closePrice', 'pnl', 'status', 'openedAt', 'closedAt', 'mode', 'strategyType'];
@@ -252,6 +259,18 @@ router.post('/backtest/run', async (req: Request, res: Response) => {
 
 router.get('/backtest/results', (_req: Request, res: Response) => {
   res.json(store.getBacktestResults());
+});
+
+router.delete('/backtest/results', (_req: Request, res: Response) => {
+  store.clearBacktestResults();
+  logger.info('Backtest history cleared');
+  res.json({ ok: true });
+});
+
+router.delete('/backtest/results/:id', (req: Request, res: Response) => {
+  const ok = store.deleteBacktestResult(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Not found' }) as any;
+  res.json({ ok: true });
 });
 
 router.get('/backtest/results/:id/export-csv', (req: Request, res: Response) => {
@@ -340,7 +359,35 @@ router.post('/strategies/:id/backtest', async (req: Request, res: Response) => {
       riskPercent: req.body.riskPercent ?? config.riskPercent,
       startingEquity: req.body.startingEquity ?? config.paperStartingEquity ?? 10_000,
     });
-    res.json(result);
+    const saved = {
+      id: uuidv4(),
+      params: {
+        symbols,
+        startDate: req.body.startDate,
+        endDate: req.body.endDate,
+        riskPercent: req.body.riskPercent ?? config.riskPercent,
+        tpMultiplier: config.tpMultiplier,
+        liquidityWindowStart: config.liquidityWindowStart,
+        liquidityWindowEnd: config.liquidityWindowEnd,
+        breakoutBufferPercent: config.breakoutBufferPercent,
+      },
+      trades: result.trades,
+      summary: result.summary,
+      runAt: Date.now(),
+      strategyType: result.strategyType,
+      instanceName: result.instanceName,
+      instanceId: inst.id,
+    };
+    store.saveBacktestResult(saved);
+    res.json({
+      ...result,
+      id: saved.id,
+      summary: result.summary,
+      totalTrades: result.summary.totalTrades,
+      winRate: result.summary.winRate,
+      totalPnl: result.summary.totalPnl,
+      maxDrawdown: result.summary.maxDrawdown,
+    });
   } catch (err: any) {
     logger.error('Strategy backtest failed', { err });
     res.status(500).json({ error: err.message });

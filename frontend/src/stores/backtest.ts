@@ -31,5 +31,19 @@ export const useBacktestStore = defineStore('backtest', () => {
     }
   }
 
-  return { results, currentResult, running, error, runBacktest, fetchResults }
+  async function clearAll() {
+    await backtestApi.clear()
+    results.value = []
+    currentResult.value = null
+  }
+
+  async function removeOne(id: string) {
+    await backtestApi.remove(id)
+    results.value = results.value.filter(r => r.id !== id)
+    if (currentResult.value?.id === id) {
+      currentResult.value = results.value[0] ?? null
+    }
+  }
+
+  return { results, currentResult, running, error, runBacktest, fetchResults, clearAll, removeOne }
 })

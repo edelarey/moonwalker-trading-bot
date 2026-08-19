@@ -44,10 +44,25 @@ export function calcPositionSize(
 ): { positionSize: number; qty: number } {
   const riskAmount = equity * (riskPercent / 100);
   const riskDistance = Math.abs(entryPrice - stopLoss);
-  const riskDistancePercent = riskDistance / entryPrice;
+  const riskDistancePercent = riskDistance / entryPrice || 0.01;
   const positionSize = riskAmount / riskDistancePercent;
   const qty = positionSize / entryPrice;
   return { positionSize, qty };
+}
+
+export function sizePosition(opts: {
+  equity: number;
+  entryPrice: number;
+  stopLoss: number;
+  riskPercent: number;
+  sizingMode?: 'risk_percent' | 'fixed_usdt';
+  fixedPositionUsdt?: number;
+}): { positionSize: number; qty: number } {
+  if (opts.sizingMode === 'fixed_usdt') {
+    const positionSize = Math.max(1, Number(opts.fixedPositionUsdt) || 100);
+    return { positionSize, qty: positionSize / opts.entryPrice };
+  }
+  return calcPositionSize(opts.equity, opts.riskPercent, opts.entryPrice, opts.stopLoss);
 }
 
 /**

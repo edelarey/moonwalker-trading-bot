@@ -44,6 +44,10 @@ export function updateTrade(id: string, updates: Partial<Trade>): void {
   if (idx >= 0) { trades[idx] = { ...trades[idx], ...updates }; writeJson('trades.json', trades); }
 }
 
+export function clearTrades(): void {
+  writeJson('trades.json', []);
+}
+
 // --- Daily Ranges ---
 export function getDailyRanges(): DailyRange[] {
   return readJson<DailyRange[]>('daily-ranges.json', []);
@@ -66,4 +70,16 @@ export function saveBacktestResult(result: BacktestResult): void {
   results.unshift(result); // newest first
   // Keep only last 50 results
   writeJson('backtest-results.json', results.slice(0, 50));
+}
+
+export function clearBacktestResults(): void {
+  writeJson('backtest-results.json', []);
+}
+
+export function deleteBacktestResult(id: string): boolean {
+  const results = getBacktestResults();
+  const next = results.filter(r => r.id !== id);
+  if (next.length === results.length) return false;
+  writeJson('backtest-results.json', next);
+  return true;
 }

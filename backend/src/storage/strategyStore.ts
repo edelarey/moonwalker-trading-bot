@@ -21,6 +21,10 @@ const TYPE_NAMES: Record<StrategyType, string> = {
   supertrend: 'Default Supertrend',
   vwap: 'Default VWAP Fade',
   orb: 'Default Opening Range Breakout',
+  funding_arb: 'Default Funding Arb (delta-neutral)',
+  cross_exchange: 'Default Cross-Exchange Hedge',
+  dynamic_delta: 'Default Dynamic Delta Hedge',
+  drawdown_hedge: 'Default Drawdown Hedge',
 };
 
 function ensureDir(): void {

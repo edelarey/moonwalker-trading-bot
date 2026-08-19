@@ -11,15 +11,7 @@ const strategiesStore = useStrategiesStore()
 const router = useRouter()
 const route = useRoute()
 
-onMounted(async () => {
-  if (!config.config) await config.fetchConfig()
-  await strategiesStore.fetchInstances()
-  const qId = route.query.strategyId
-  if (qId && typeof qId === 'string') {
-    selectedInstanceId.value = qId
-    mode.value = 'strategy'
-  }
-})
+const FORM_KEY = 'moonwalker.backtest.form'
 
 // ── Mode ──────────────────────────────────────────────────────────────────────
 // 'global' = Break & Bounce with full param controls
@@ -32,17 +24,10 @@ const selectedInstance = computed<StrategyInstance | null>(() =>
   strategiesStore.instances.find(i => i.id === selectedInstanceId.value) ?? null
 )
 
-watch(selectedInstance, inst => {
-  if (inst) {
-    // Pre-select the instance's own symbols
-    selectedSymbols.value = [...inst.symbols]
-  }
-})
-
 // ── Shared ────────────────────────────────────────────────────────────────────
 const startDate = ref('2024-01-01')
 const endDate = ref(new Date().toISOString().split('T')[0])
-const selectedSymbols = ref<string[]>([])
+const selectedSymbols = ref<string[]>(['BTCUSDT'])
 
 const allSymbols = computed(() =>
   config.config?.symbols.filter(s => s.enabled).map(s => s.symbol) ?? []
@@ -64,6 +49,79 @@ const primaryTimeframe = ref<'D' | 'W' | 'M'>('D')
 const breakoutTimeframe = ref('15')
 const entryTimeframe = ref('5')
 
+function defaultSymbols(): string[] {
+  const enabled = config.config?.symbols.filter(s => s.enabled).map(s => s.symbol) ?? []
+  return enabled.includes('BTCUSDT') ? ['BTCUSDT'] : (enabled[0] ? [enabled[0]] : ['BTCUSDT'])
+}
+
+function loadForm(): void {
+  try {
+    const raw = localStorage.getItem(FORM_KEY)
+    if (!raw) {
+      selectedSymbols.value = defaultSymbols()
+      return
+    }
+    const saved = JSON.parse(raw) as Record<string, unknown>
+    if (saved.mode === 'global' || saved.mode === 'strategy') mode.value = saved.mode
+    if (typeof saved.selectedInstanceId === 'string') selectedInstanceId.value = saved.selectedInstanceId
+    if (typeof saved.startDate === 'string') startDate.value = saved.startDate
+    if (typeof saved.endDate === 'string') endDate.value = saved.endDate
+    if (Array.isArray(saved.selectedSymbols) && saved.selectedSymbols.length) {
+      selectedSymbols.value = saved.selectedSymbols.map(String)
+    } else {
+      selectedSymbols.value = defaultSymbols()
+    }
+    if (typeof saved.riskPercent === 'number') riskPercent.value = saved.riskPercent
+    if (typeof saved.tpMultiplier === 'number') tpMultiplier.value = saved.tpMultiplier
+    if (typeof saved.windowStart === 'string') windowStart.value = saved.windowStart
+    if (typeof saved.windowEnd === 'string') windowEnd.value = saved.windowEnd
+    if (typeof saved.bufferPercent === 'number') bufferPercent.value = saved.bufferPercent
+    if (saved.primaryTimeframe === 'D' || saved.primaryTimeframe === 'W' || saved.primaryTimeframe === 'M') {
+      primaryTimeframe.value = saved.primaryTimeframe
+    }
+    if (typeof saved.breakoutTimeframe === 'string') breakoutTimeframe.value = saved.breakoutTimeframe
+    if (typeof saved.entryTimeframe === 'string') entryTimeframe.value = saved.entryTimeframe
+  } catch {
+    selectedSymbols.value = defaultSymbols()
+  }
+}
+
+function saveForm(): void {
+  const payload = {
+    mode: mode.value,
+    selectedInstanceId: selectedInstanceId.value,
+    startDate: startDate.value,
+    endDate: endDate.value,
+    selectedSymbols: selectedSymbols.value,
+    riskPercent: riskPercent.value,
+    tpMultiplier: tpMultiplier.value,
+    windowStart: windowStart.value,
+    windowEnd: windowEnd.value,
+    bufferPercent: bufferPercent.value,
+    primaryTimeframe: primaryTimeframe.value,
+    breakoutTimeframe: breakoutTimeframe.value,
+    entryTimeframe: entryTimeframe.value,
+  }
+  localStorage.setItem(FORM_KEY, JSON.stringify(payload))
+}
+
+onMounted(async () => {
+  if (!config.config) await config.fetchConfig()
+  await strategiesStore.fetchInstances()
+  loadForm()
+  const qId = route.query.strategyId
+  if (qId && typeof qId === 'string') {
+    selectedInstanceId.value = qId
+    mode.value = 'strategy'
+  }
+})
+
+watch(
+  [mode, selectedInstanceId, startDate, endDate, selectedSymbols, riskPercent, tpMultiplier, windowStart, windowEnd, bufferPercent, primaryTimeframe, breakoutTimeframe, entryTimeframe],
+  saveForm,
+  { deep: true },
+)
+
 // ── Param summary for selected strategy ──────────────────────────────────────
 const paramEntries = computed<[string, any][]>(() => {
   if (!selectedInstance.value) return []
@@ -79,10 +137,13 @@ async function run() {
     if (!selectedInstance.value) return
     strategyError.value = null
     strategyRunning.value = true
+    const symbols = selectedSymbols.value.length ? selectedSymbols.value : defaultSymbols()
     const result = await strategiesStore.runBacktest(
       selectedInstance.value.id,
       startDate.value,
       endDate.value,
+      symbols,
+      riskPercent.value,
     )
     strategyRunning.value = false
     if (result) {
@@ -91,10 +152,10 @@ async function run() {
         selectedInstance.value.name,
         instanceType(selectedInstance.value),
         {
-          totalTrades: result.totalTrades ?? 0,
-          winRate: result.winRate ?? 0,
-          totalPnl: result.totalPnl ?? 0,
-          maxDrawdown: result.maxDrawdown ?? 0,
+          totalTrades: result.totalTrades ?? result.summary?.totalTrades ?? result.trades?.length ?? 0,
+          winRate: result.winRate ?? result.summary?.winRate ?? 0,
+          totalPnl: result.totalPnl ?? result.summary?.totalPnl ?? 0,
+          maxDrawdown: result.maxDrawdown ?? result.summary?.maxDrawdown ?? 0,
         },
       )
       router.push('/strategies/results')
@@ -122,9 +183,7 @@ async function run() {
 
 const isRunning = computed(() => mode.value === 'strategy' ? strategyRunning.value : backtestStore.running)
 const canRun = computed(() =>
-  mode.value === 'strategy'
-    ? !!selectedInstance.value
-    : selectedSymbols.value.length > 0
+  selectedSymbols.value.length > 0 && (mode.value === 'global' || !!selectedInstance.value)
 )
 
 function formatParamKey(key: string): string {
@@ -208,12 +267,15 @@ function formatParamKey(key: string): string {
               <span class="label-text text-xs mb-1">End Date</span>
               <input type="date" class="input input-bordered" v-model="endDate" />
             </label>
+            <label class="form-control">
+              <span class="label-text text-xs mb-1">Risk % if stop-loss hits</span>
+              <input type="number" step="0.1" min="0.1" max="10" class="input input-bordered" v-model.number="riskPercent" />
+            </label>
 
             <!-- Symbols notice -->
             <div v-if="selectedInstance" class="alert text-xs py-2">
               <span>
-                Symbols used: <strong>{{ selectedInstance.symbols.join(', ') || '(none configured)' }}</strong>.
-                Override below if needed.
+                Defaults to <strong>BTCUSDT</strong> only. Your last selection is remembered when you leave this page.
               </span>
             </div>
           </div>
@@ -227,7 +289,7 @@ function formatParamKey(key: string): string {
             Symbols
             <span class="badge badge-sm badge-neutral ml-2">{{ selectedSymbols.length }} selected</span>
           </h2>
-          <p class="text-xs text-base-content/50 mb-2">Pre-selected from the strategy's configuration. Toggle to override.</p>
+          <p class="text-xs text-base-content/50 mb-2">Only BTCUSDT is selected by default. Toggle others on if you want a multi-coin run.</p>
           <div class="flex flex-wrap gap-2 mt-2">
             <button
               v-for="sym in allSymbols"

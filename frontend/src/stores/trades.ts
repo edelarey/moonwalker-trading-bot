@@ -51,6 +51,18 @@ export const useTradesStore = defineStore('trades', () => {
     } catch { /* ignore */ }
   }
 
+  async function clearHistory() {
+    const data = await tradesApi.clear()
+    trades.value = []
+    positions.value = []
+    if (data.account) {
+      paper.value = data.account
+      equity.value = data.account.equity
+    } else {
+      await fetchEquity()
+    }
+  }
+
   async function resetPaper(startingEquity?: number) {
     paper.value = await paperApi.reset(startingEquity)
     equity.value = paper.value.equity
@@ -76,6 +88,6 @@ export const useTradesStore = defineStore('trades', () => {
   return {
     trades, positions, equity, paper, loading,
     openTrades, closedTrades, paperTrades, totalPnl, winRate,
-    fetchTrades, fetchPositions, fetchEquity, resetPaper, closePosition, addTrade, setPaperAccount,
+    fetchTrades, fetchPositions, fetchEquity, resetPaper, clearHistory, closePosition, addTrade, setPaperAccount,
   }
 })

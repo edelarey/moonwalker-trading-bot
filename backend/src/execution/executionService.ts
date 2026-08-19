@@ -2,7 +2,7 @@ import { loadConfig } from '../config';
 import { hasApiKeys } from '../security/secrets';
 import { logger } from '../logger';
 import { closePosition, getAccountEquity, placeMarketOrder } from '../bybit/client';
-import { calcPositionSize } from '../strategy/riskManager';
+import { sizePosition } from '../strategy/riskManager';
 import { store } from '../storage/store';
 import { paperBroker } from './paperBroker';
 import {
@@ -54,7 +54,14 @@ function sizeOrder(
     const positionSize = Number(dcaInv);
     return { positionSize, qty: positionSize / signal.price };
   }
-  return calcPositionSize(equity, config.riskPercent, signal.price, sl);
+  return sizePosition({
+    equity,
+    entryPrice: signal.price,
+    stopLoss: sl,
+    riskPercent: config.riskPercent,
+    sizingMode: config.sizingMode ?? 'risk_percent',
+    fixedPositionUsdt: config.fixedPositionUsdt ?? 100,
+  });
 }
 
 function findOpen(inst: StrategyInstance, symbol: string, tag?: string): Trade | undefined {

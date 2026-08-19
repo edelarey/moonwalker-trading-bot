@@ -20,16 +20,23 @@ export type StrategyType =
   | 'supertrend'
   | 'vwap'
   | 'orb'
+  | 'funding_arb'
+  | 'cross_exchange'
+  | 'dynamic_delta'
+  | 'drawdown_hedge'
 
 export const ALL_STRATEGY_TYPES: StrategyType[] = [
   'break_bounce', 'dca', 'grid', 'ma_crossover', 'rsi', 'bollinger',
   'donchian', 'ema_pullback', 'supertrend', 'vwap', 'orb',
+  'funding_arb', 'cross_exchange', 'dynamic_delta', 'drawdown_hedge',
 ]
 
 export interface SymbolConfig { symbol: string; enabled: boolean; addedAt: number }
 export interface AppConfig {
   symbols: SymbolConfig[]
   riskPercent: number
+  sizingMode?: 'risk_percent' | 'fixed_usdt'
+  fixedPositionUsdt?: number
   tpMultiplier: number
   liquidityWindowStart: string
   liquidityWindowEnd: string
@@ -105,7 +112,16 @@ export interface BacktestSummary {
   maxDrawdown: number; maxDrawdownPercent: number; avgRR: number
   startingEquity: number; endingEquity: number
 }
-export interface BacktestResult { id: string; params: BacktestParams; trades: Trade[]; summary: BacktestSummary; runAt: number }
+export interface BacktestResult {
+  id: string
+  params: BacktestParams
+  trades: Trade[]
+  summary: BacktestSummary
+  runAt: number
+  strategyType?: string
+  instanceName?: string
+  instanceId?: string
+}
 
 export const configApi = {
   get: () => api.get<AppConfig>('/config').then(r => r.data),
@@ -151,6 +167,7 @@ export const dailyRangesApi = {
 }
 export const tradesApi = {
   list: () => api.get<Trade[]>('/trades').then(r => r.data),
+  clear: () => api.delete<{ ok: boolean; account?: PaperAccountSnapshot }>('/trades').then(r => r.data),
   exportCsv: () => { window.open('/api/trades/export-csv', '_blank') },
 }
 export const positionsApi = {
@@ -168,5 +185,7 @@ export const paperApi = {
 export const backtestApi = {
   run: (params: BacktestParams) => api.post<BacktestResult>('/backtest/run', params).then(r => r.data),
   results: () => api.get<BacktestResult[]>('/backtest/results').then(r => r.data),
+  clear: () => api.delete<{ ok: boolean }>('/backtest/results').then(r => r.data),
+  remove: (id: string) => api.delete<{ ok: boolean }>(`/backtest/results/${id}`).then(r => r.data),
   exportCsv: (id: string) => { window.open(`/api/backtest/results/${id}/export-csv`, '_blank') },
 }

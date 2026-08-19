@@ -238,6 +238,17 @@ export class PaperBroker {
     return closed;
   }
 
+  applyCashPnl(tradeId: string, amount: number): Trade | null {
+    const trade = store.getTrades().find(t => t.id === tradeId);
+    if (!trade) return null;
+    const next = (trade.pnl ?? 0) + amount;
+    this.state.realizedPnl += amount;
+    this.state.updatedAt = Date.now();
+    writeState(this.state);
+    store.updateTrade(tradeId, { pnl: next });
+    return { ...trade, pnl: next };
+  }
+
   closeById(tradeId: string, reason: Exclude<TradeStatus, 'open'> = 'closed_manual'): Trade | null {
     const trade = this.openTrades().find(t => t.id === tradeId);
     if (!trade) return null;
@@ -305,6 +316,19 @@ export class PaperBroker {
     };
     writeState(this.state);
     logger.info('Paper account reset', { startingEquity: this.state.startingEquity });
+    return this.getSnapshot();
+  }
+
+  /** Zero paper PnL after the trade log has been wiped. Does not write new trades. */
+  wipeAfterHistoryClear(): PaperAccountSnapshot {
+    const config = loadConfig();
+    this.state = {
+      startingEquity: this.state.startingEquity || config.paperStartingEquity || 10_000,
+      realizedPnl: 0,
+      totalFees: 0,
+      updatedAt: Date.now(),
+    };
+    writeState(this.state);
     return this.getSnapshot();
   }
 }

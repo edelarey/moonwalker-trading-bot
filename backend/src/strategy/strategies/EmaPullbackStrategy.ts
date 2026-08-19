@@ -30,7 +30,7 @@ export class EmaPullbackStrategy implements IStrategy {
   }
 
   onCandle(symbol: string, candle: Candle, interval: string): StrategySignal | null {
-    if (interval !== this.params.timeframe) return null;
+    if (String(interval) !== String(this.params.timeframe)) return null;
     const closes = this.closes.get(symbol) ?? [];
     closes.push(candle.close);
     if (closes.length > this.params.slowPeriod + 30) closes.shift();

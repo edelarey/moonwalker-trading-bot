@@ -32,7 +32,7 @@ export class SupertrendStrategy implements IStrategy {
   }
 
   onCandle(symbol: string, candle: Candle, interval: string): StrategySignal | null {
-    if (interval !== this.params.timeframe) return null;
+    if (String(interval) !== String(this.params.timeframe)) return null;
     const buf = this.candles.get(symbol) ?? [];
     buf.push(candle);
     if (buf.length > this.params.atrPeriod + 50) buf.shift();

@@ -1,7 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import { BacktestSummary, StrategyInstance, Trade } from '../types';
 import { IStrategy, BacktestStrategyParams, StrategyBacktestResult } from './IStrategy';
-import { fetchCandles } from '../bybit/client';
+import { fetchCandlesRange } from '../bybit/client';
+import { logger } from '../logger';
+import { loadConfig } from '../config';
+import { sizePosition } from './riskManager';
 
 export function calcSummary(trades: Trade[], startEquity: number, endEquity: number): BacktestSummary {
   const winners = trades.filter(t => (t.pnl ?? 0) > 0);
@@ -90,17 +93,77 @@ export async function runSignalBacktest(opts: {
   let equity = opts.params.startingEquity;
   const equityCurve = [{ time: startMs, equity }];
 
+  function closeTrade(
+    symbol: string,
+    entryPrice: number,
+    entryTime: number,
+    entryDir: 'bullish' | 'bearish',
+    sl: number,
+    tp: number,
+    exitPrice: number,
+    closedAt: number,
+    high: number,
+    low: number,
+  ): void {
+    const cfg = loadConfig();
+    const { positionSize: posSize, qty } = sizePosition({
+      equity,
+      entryPrice,
+      stopLoss: sl,
+      riskPercent: opts.params.riskPercent,
+      sizingMode: cfg.sizingMode ?? 'risk_percent',
+      fixedPositionUsdt: cfg.fixedPositionUsdt ?? 100,
+    });
+    const pnlFactor = entryDir === 'bullish' ? 1 : -1;
+    const pnl = ((exitPrice - entryPrice) / entryPrice) * posSize * pnlFactor;
+    trades.push(makeBacktestTrade({
+      symbol,
+      direction: entryDir,
+      entryPrice,
+      closePrice: exitPrice,
+      stopLoss: sl,
+      takeProfit: tp,
+      riskPercent: opts.params.riskPercent,
+      positionSize: posSize,
+      qty,
+      openedAt: entryTime,
+      closedAt,
+      pnl,
+      equity,
+      patternType: opts.strategyType,
+      high,
+      low,
+    }));
+    equity += pnl;
+    equityCurve.push({ time: closedAt, equity });
+  }
+
+  const tf = String(opts.timeframe);
+
   for (const symbol of opts.params.symbols) {
-    const candles = await fetchCandles(symbol, opts.timeframe as any, 1000, startMs, endMs);
-    const inst = opts.create({ ...opts.instance, params: opts.params.params, symbols: [symbol] });
+    let candles: Awaited<ReturnType<typeof fetchCandlesRange>> = [];
+    try {
+      candles = await fetchCandlesRange(symbol, tf, startMs, endMs);
+    } catch (err) {
+      logger.warn('Backtest skipped symbol (no klines)', { symbol, timeframe: tf, err });
+      continue;
+    }
+    if (!candles.length) {
+      logger.warn('Backtest: zero candles', { symbol, timeframe: tf, start: opts.params.startDate, end: opts.params.endDate });
+      continue;
+    }
+
+    const inst = opts.create({ ...opts.instance, params: { ...opts.params.params, timeframe: tf }, symbols: [symbol] });
     let entryPrice = 0;
     let entryTime = 0;
     let entryDir: 'bullish' | 'bearish' = 'bullish';
     let sl = 0;
     let tp = 0;
+    let last = candles[0];
 
     for (const c of candles) {
-      const sig = inst.onCandle(symbol, c, opts.timeframe);
+      last = c;
+      const sig = inst.onCandle(symbol, c, tf);
       if (sig?.type === 'entry') {
         entryPrice = sig.price;
         entryTime = c.openTime;
@@ -109,32 +172,13 @@ export async function runSignalBacktest(opts: {
         tp = sig.takeProfit ?? (entryDir === 'bullish' ? entryPrice * 1.04 : entryPrice * 0.96);
       }
       if (sig?.type === 'exit' && entryPrice > 0) {
-        const posSize = (equity * opts.params.riskPercent) / 100;
-        const qty = posSize / entryPrice;
-        const pnlFactor = entryDir === 'bullish' ? 1 : -1;
-        const pnl = ((sig.price - entryPrice) / entryPrice) * posSize * pnlFactor;
-        trades.push(makeBacktestTrade({
-          symbol,
-          direction: entryDir,
-          entryPrice,
-          closePrice: sig.price,
-          stopLoss: sl,
-          takeProfit: tp,
-          riskPercent: opts.params.riskPercent,
-          positionSize: posSize,
-          qty,
-          openedAt: entryTime,
-          closedAt: c.openTime,
-          pnl,
-          equity,
-          patternType: opts.strategyType,
-          high: c.high,
-          low: c.low,
-        }));
-        equity += pnl;
-        equityCurve.push({ time: c.openTime, equity });
+        closeTrade(symbol, entryPrice, entryTime, entryDir, sl, tp, sig.price, c.openTime, c.high, c.low);
         entryPrice = 0;
       }
+    }
+
+    if (entryPrice > 0 && last) {
+      closeTrade(symbol, entryPrice, entryTime, entryDir, sl, tp, last.close, last.openTime, last.high, last.low);
     }
   }
 

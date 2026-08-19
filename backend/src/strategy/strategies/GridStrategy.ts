@@ -97,7 +97,7 @@ export class GridStrategy implements IStrategy {
   }
 
   async backtest(params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
-    const { fetchCandles } = await import('../../bybit/client');
+    const { fetchCandlesRange } = await import('../../bybit/client');
     const startMs = new Date(params.startDate + 'T00:00:00Z').getTime();
     const endMs = new Date(params.endDate + 'T00:00:00Z').getTime() + 86400000;
     const p = params.params as unknown as GridParams;
@@ -107,7 +107,7 @@ export class GridStrategy implements IStrategy {
     const openGridTrades: Map<string, { entry: number; time: number; gridIdx: number }> = new Map();
 
     for (const symbol of params.symbols) {
-      const candles = await fetchCandles(symbol, 'D', 1000, startMs, endMs);
+      const candles = await fetchCandlesRange(symbol, 'D', startMs, endMs);
       if (!candles.length) continue;
       const autoUpper = p.upperPrice || candles[0].close * 1.15;
       const autoLower = p.lowerPrice || candles[0].close * 0.85;

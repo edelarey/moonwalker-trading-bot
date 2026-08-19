@@ -89,6 +89,10 @@ const typeBadgeClass: Record<string, string> = {
   supertrend: 'badge-accent',
   vwap: 'badge-secondary',
   orb: 'badge-warning',
+  funding_arb: 'badge-accent',
+  cross_exchange: 'badge-info',
+  dynamic_delta: 'badge-secondary',
+  drawdown_hedge: 'badge-error',
 }
 
 function signalBadgeClass(signal: string): string {
@@ -213,16 +217,47 @@ function signalBadgeClass(signal: string): string {
           </div>
           <p class="text-xs text-warning/80 mb-3">⚠ Timeframe changes take effect after restarting the backend.</p>
 
+          <h3 class="text-sm font-semibold text-base-content/70 uppercase tracking-wide mt-4 mb-2">Position size</h3>
+          <p class="text-xs text-base-content/50 mb-2">
+            Default for EMA, Supertrend, RSI, VWAP, ORB, Donchian, MA, Bollinger, and Break &amp; Bounce.
+            DCA / Grid still use their own USDT-per-buy settings.
+          </p>
+          <div class="flex flex-wrap gap-2 mb-3">
+            <button
+              class="btn btn-sm"
+              :class="(config.config.sizingMode ?? 'risk_percent') === 'risk_percent' ? 'btn-primary' : 'btn-outline'"
+              @click="config.updateConfig({ sizingMode: 'risk_percent' })"
+            >Use risk %</button>
+            <button
+              class="btn btn-sm"
+              :class="config.config.sizingMode === 'fixed_usdt' ? 'btn-primary' : 'btn-outline'"
+              @click="config.updateConfig({ sizingMode: 'fixed_usdt' })"
+            >Use fixed USDT</button>
+          </div>
+
           <!-- Risk params grid -->
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <label class="form-control">
-            <span class="label-text text-xs mb-1">Risk % per trade (max 1)</span>
+            <span class="label-text text-xs mb-1">Risk % if stop-loss hits</span>
             <input
-              type="number" step="0.1" min="0.1" max="1"
+              type="number" step="0.1" min="0.1" max="10"
               class="input input-bordered input-sm"
               :value="config.config.riskPercent"
               @change="config.updateConfig({ riskPercent: parseFloat(($event.target as HTMLInputElement).value) })"
             />
+            <span class="label-text-alt text-xs mt-1 text-base-content/40">
+              Used when “Use risk %” is selected. 1 = lose 1% of equity if SL hits.
+            </span>
+          </label>
+          <label class="form-control">
+            <span class="label-text text-xs mb-1">USDT per trade (notional)</span>
+            <input
+              type="number" step="10" min="1"
+              class="input input-bordered input-sm"
+              :value="config.config.fixedPositionUsdt ?? 100"
+              @change="config.updateConfig({ fixedPositionUsdt: parseFloat(($event.target as HTMLInputElement).value) })"
+            />
+            <span class="label-text-alt text-xs mt-1 text-base-content/40">Used when “Use fixed USDT” is selected.</span>
           </label>
           <label class="form-control">
             <span class="label-text text-xs mb-1">TP Multiplier (R:R)</span>

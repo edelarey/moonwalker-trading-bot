@@ -46,6 +46,10 @@ const typeBadgeClass: Record<StrategyType, string> = {
   supertrend: 'badge-accent',
   vwap: 'badge-secondary',
   orb: 'badge-warning',
+  funding_arb: 'badge-accent',
+  cross_exchange: 'badge-info',
+  dynamic_delta: 'badge-secondary',
+  drawdown_hedge: 'badge-error',
 }
 
 const isPaper = computed(() => (configStore.config?.tradingMode ?? 'paper') === 'paper')
@@ -144,6 +148,7 @@ function goBacktest(inst: StrategyInstance) {
 const backtestPanelId = ref<string | null>(null)
 const backtestStart = ref('')
 const backtestEnd = ref('')
+const backtestRisk = ref(1)
 const backtestLoading = ref(false)
 const backtestResultMap = ref<Record<string, Record<string, any>>>({})
 
@@ -159,7 +164,7 @@ function toggleBacktestPanel(inst: StrategyInstance) {
 async function runBacktest(inst: StrategyInstance) {
   if (!backtestStart.value || !backtestEnd.value) return
   backtestLoading.value = true
-  const result = await store.runBacktest(inst.id, backtestStart.value, backtestEnd.value)
+  const result = await store.runBacktest(inst.id, backtestStart.value, backtestEnd.value, undefined, backtestRisk.value)
   backtestLoading.value = false
   if (result) {
     const summary = result.summary ?? result
@@ -262,6 +267,10 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
               <div class="form-control flex-1 min-w-[130px]">
                 <label class="label py-0"><span class="label-text text-xs">End Date</span></label>
                 <input type="date" v-model="backtestEnd" class="input input-bordered input-xs" />
+              </div>
+              <div class="form-control flex-1 min-w-[90px]">
+                <label class="label py-0"><span class="label-text text-xs">Risk %</span></label>
+                <input type="number" step="0.1" min="0.1" max="10" v-model.number="backtestRisk" class="input input-bordered input-xs" />
               </div>
             </div>
             <button
@@ -501,6 +510,67 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">TP R-multiple</span><input type="number" v-model.number="formParams.takeProfitRr" class="input input-bordered input-xs" step="0.1" /></label>
                 <label class="form-control"><span class="label-text text-xs">Buffer %</span><input type="number" v-model.number="formParams.breakoutBufferPercent" class="input input-bordered input-xs" step="0.01" /></label>
                 <label class="form-control"><span class="label-text text-xs">Timeframe</span>
+                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
+                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
+                  </select>
+                </label>
+              </div>
+            </template>
+
+            <template v-if="formType === 'funding_arb'">
+              <p class="text-xs text-base-content/50">Paper: virtual spot + short perp, keep funding when rate is positive. Live only shorts the perp.</p>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="form-control"><span class="label-text text-xs">Min 8h funding</span><input type="number" step="0.00001" v-model.number="formParams.minFundingRate" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Exit funding</span><input type="number" step="0.00001" v-model.number="formParams.exitFundingRate" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Max basis %</span><input type="number" step="0.05" v-model.number="formParams.maxBasisPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Stop basis %</span><input type="number" step="0.05" v-model.number="formParams.stopBasisPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
+                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
+                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
+                  </select>
+                </label>
+              </div>
+            </template>
+
+            <template v-if="formType === 'cross_exchange'">
+              <p class="text-xs text-base-content/50">Fades Bybit vs Binance (public ticker). Backtest uses Bybit perp vs spot.</p>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="form-control"><span class="label-text text-xs">Enter spread %</span><input type="number" step="0.01" v-model.number="formParams.minSpreadPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Exit spread %</span><input type="number" step="0.01" v-model.number="formParams.exitSpreadPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Stop spread %</span><input type="number" step="0.01" v-model.number="formParams.stopSpreadPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Max hold (min)</span><input type="number" v-model.number="formParams.maxHoldMinutes" class="input input-bordered input-xs" /></label>
+                <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
+                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
+                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
+                  </select>
+                </label>
+              </div>
+            </template>
+
+            <template v-if="formType === 'dynamic_delta'">
+              <p class="text-xs text-base-content/50">Hedges net long inventory when delta or vol is too high. Backtest assumes a standing long bag.</p>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="form-control"><span class="label-text text-xs">Hedge symbol</span><input type="text" v-model="formParams.hedgeSymbol" class="input input-bordered input-xs uppercase" /></label>
+                <label class="form-control"><span class="label-text text-xs">Delta threshold %</span><input type="number" step="1" v-model.number="formParams.deltaThresholdPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Vol trigger ATR%</span><input type="number" step="0.1" v-model.number="formParams.volTriggerPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Hedge ratio</span><input type="number" step="0.1" min="0.1" max="1" v-model.number="formParams.hedgeRatio" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Backtest inventory USDT</span><input type="number" v-model.number="formParams.inventoryUsdt" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Timeframe</span>
+                  <select v-model="formParams.timeframe" class="select select-bordered select-xs">
+                    <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
+                  </select>
+                </label>
+              </div>
+            </template>
+
+            <template v-if="formType === 'drawdown_hedge'">
+              <p class="text-xs text-base-content/50">Shorts after a peak-to-trough drop in paper equity (or buy-and-hold in a backtest). Covers on recovery.</p>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="form-control"><span class="label-text text-xs">Hedge symbol</span><input type="text" v-model="formParams.hedgeSymbol" class="input input-bordered input-xs uppercase" /></label>
+                <label class="form-control"><span class="label-text text-xs">Drawdown %</span><input type="number" step="0.5" v-model.number="formParams.drawdownPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Recover %</span><input type="number" step="0.5" v-model.number="formParams.recoverPercent" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Hedge portion</span><input type="number" step="0.1" min="0.1" max="1" v-model.number="formParams.hedgePortion" class="input input-bordered input-xs" /></label>
+                <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
                   <select v-model="formParams.timeframe" class="select select-bordered select-xs">
                     <option v-for="tf in timeframeOptions" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
                   </select>

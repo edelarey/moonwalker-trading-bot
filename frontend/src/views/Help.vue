@@ -131,6 +131,10 @@ const faqs = [
             <tr><td class="font-mono text-xs">supertrend</td><td class="text-xs">ATR trailing band. Stay in the move until the band flips.</td></tr>
             <tr><td class="font-mono text-xs">vwap</td><td class="text-xs">Fade extensions away from the UTC-session VWAP; target is VWAP itself.</td></tr>
             <tr><td class="font-mono text-xs">orb</td><td class="text-xs">First N minutes after UTC midnight set a range; trade the first close beyond it.</td></tr>
+            <tr><td class="font-mono text-xs">funding_arb</td><td class="text-xs">Delta-neutral funding harvest: virtual spot + short perp when 8h funding is rich. Paper credits funding; live only shorts the perp.</td></tr>
+            <tr><td class="font-mono text-xs">cross_exchange</td><td class="text-xs">Fade Bybit vs Binance when the gap is wide; cover when it snaps back. Backtest uses Bybit perp vs spot.</td></tr>
+            <tr><td class="font-mono text-xs">dynamic_delta</td><td class="text-xs">Hedge net long inventory when |delta|/equity or ATR% exceeds a trigger.</td></tr>
+            <tr><td class="font-mono text-xs">drawdown_hedge</td><td class="text-xs">After a peak-to-trough equity drop, short a portion; cover when drawdown shrinks.</td></tr>
           </tbody>
         </table>
       </div>

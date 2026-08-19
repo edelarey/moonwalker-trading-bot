@@ -135,16 +135,35 @@ export const useStrategiesStore = defineStore('strategies', () => {
     }
   }
 
-  async function runBacktest(id: string, startDate: string, endDate: string): Promise<Record<string, any> | null> {
+  function pickSummary(result: Record<string, any>): {
+    totalTrades: number; winRate: number; totalPnl: number; maxDrawdown: number
+  } {
+    const s = result.summary ?? result
+    return {
+      totalTrades: s.totalTrades ?? result.trades?.length ?? 0,
+      winRate: s.winRate ?? 0,
+      totalPnl: s.totalPnl ?? 0,
+      maxDrawdown: s.maxDrawdown ?? 0,
+    }
+  }
+
+  async function runBacktest(
+    id: string,
+    startDate: string,
+    endDate: string,
+    symbols?: string[],
+    riskPercent?: number,
+  ): Promise<Record<string, any> | null> {
     error.value = null
     try {
       const res = await fetch(`${API_BASE}/api/strategies/${id}/backtest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDate, endDate }),
+        body: JSON.stringify({ startDate, endDate, symbols, riskPercent }),
       })
       if (!res.ok) throw new Error(`Backtest failed: ${res.statusText}`)
-      return await res.json()
+      const raw = await res.json()
+      return { ...raw, ...pickSummary(raw) }
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
       return null

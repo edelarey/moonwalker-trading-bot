@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useTradesStore } from '@/stores/trades'
-import { keysApi, type ApiKeyStatus } from '@/api/client'
+import { keysApi, backtestApi, type ApiKeyStatus } from '@/api/client'
 
 const config = useConfigStore()
 const trades = useTradesStore()
@@ -16,6 +16,8 @@ const saved = ref(false)
 const keyError = ref('')
 const liveConfirm = ref('')
 const resetting = ref(false)
+const clearingTrades = ref(false)
+const clearingBacktests = ref(false)
 const keyStatus = ref<ApiKeyStatus | null>(null)
 const showSecret = ref(false)
 
@@ -74,6 +76,18 @@ async function clearKeys() {
   await config.fetchConfig()
 }
 
+async function clearTrades() {
+  if (!confirm('Clear all paper and live trade history? Open paper positions are dropped and paper equity resets to the starting balance.')) return
+  clearingTrades.value = true
+  try { await trades.clearHistory() } finally { clearingTrades.value = false }
+}
+
+async function clearBacktests() {
+  if (!confirm('Clear all saved backtests? This cannot be undone.')) return
+  clearingBacktests.value = true
+  try { await backtestApi.clear() } finally { clearingBacktests.value = false }
+}
+
 async function resetPaper() {
   if (!confirm('Reset the paper account? Open paper positions will be closed. Full trade history is kept.')) return
   resetting.value = true
@@ -115,6 +129,42 @@ async function resetPaper() {
         </div>
         <p v-if="config.error" class="text-sm text-loss">{{ config.error }}</p>
 
+        <div v-if="config.config" class="space-y-2">
+          <h3 class="text-sm font-semibold">Default position size</h3>
+          <div class="flex flex-wrap gap-2">
+            <button
+              class="btn btn-sm"
+              :class="(config.config.sizingMode ?? 'risk_percent') === 'risk_percent' ? 'btn-primary' : 'btn-outline'"
+              @click="config.updateConfig({ sizingMode: 'risk_percent' })"
+            >Risk % of equity</button>
+            <button
+              class="btn btn-sm"
+              :class="config.config.sizingMode === 'fixed_usdt' ? 'btn-primary' : 'btn-outline'"
+              @click="config.updateConfig({ sizingMode: 'fixed_usdt' })"
+            >Fixed USDT per trade</button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="form-control">
+              <span class="label-text text-xs mb-1">Risk % if stop-loss hits</span>
+              <input
+                type="number" step="0.1" min="0.1" max="10"
+                class="input input-bordered input-sm"
+                :value="config.config.riskPercent"
+                @change="config.updateConfig({ riskPercent: parseFloat(($event.target as HTMLInputElement).value) })"
+              />
+            </label>
+            <label class="form-control">
+              <span class="label-text text-xs mb-1">USDT notional per trade</span>
+              <input
+                type="number" step="10" min="1"
+                class="input input-bordered input-sm"
+                :value="config.config.fixedPositionUsdt ?? 100"
+                @change="config.updateConfig({ fixedPositionUsdt: parseFloat(($event.target as HTMLInputElement).value) })"
+              />
+            </label>
+          </div>
+        </div>
+
         <div v-if="config.config" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <label class="form-control">
             <span class="label-text text-xs mb-1">Paper starting equity (USDT)</span>
@@ -147,6 +197,23 @@ async function resetPaper() {
         <button class="btn btn-sm btn-warning" :disabled="resetting" @click="resetPaper">
           {{ resetting ? 'Resetting…' : 'Reset paper account (keeps history)' }}
         </button>
+      </div>
+    </div>
+
+    <div class="card bg-base-200 border border-base-300">
+      <div class="card-body p-4 space-y-3">
+        <h2 class="card-title text-base">Clear test history</h2>
+        <p class="text-sm text-base-content/60">
+          Wipe local logs so you can start a clean paper or backtest session. Strategies, coins, and API keys are not touched.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-sm btn-error btn-outline" :disabled="clearingTrades" @click="clearTrades">
+            {{ clearingTrades ? 'Clearing…' : 'Clear trade history' }}
+          </button>
+          <button class="btn btn-sm btn-error btn-outline" :disabled="clearingBacktests" @click="clearBacktests">
+            {{ clearingBacktests ? 'Clearing…' : 'Clear backtest history' }}
+          </button>
+        </div>
       </div>
     </div>
 

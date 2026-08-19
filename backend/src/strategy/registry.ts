@@ -19,6 +19,10 @@ import { SupertrendStrategy } from './strategies/SupertrendStrategy';
 import { VwapStrategy } from './strategies/VwapStrategy';
 import { OrbStrategy } from './strategies/OrbStrategy';
 import { BreakBounceStrategy } from './strategies/BreakBounceStrategy';
+import { FundingArbStrategy } from './strategies/FundingArbStrategy';
+import { CrossExchangeHedgeStrategy } from './strategies/CrossExchangeHedgeStrategy';
+import { DynamicDeltaHedgeStrategy } from './strategies/DynamicDeltaHedgeStrategy';
+import { DrawdownHedgeStrategy } from './strategies/DrawdownHedgeStrategy';
 import { logger } from '../logger';
 
 export class StrategyRegistry extends EventEmitter {
@@ -38,6 +42,10 @@ export class StrategyRegistry extends EventEmitter {
       case 'supertrend': return new SupertrendStrategy(inst);
       case 'vwap': return new VwapStrategy(inst);
       case 'orb': return new OrbStrategy(inst);
+      case 'funding_arb': return new FundingArbStrategy(inst);
+      case 'cross_exchange': return new CrossExchangeHedgeStrategy(inst);
+      case 'dynamic_delta': return new DynamicDeltaHedgeStrategy(inst);
+      case 'drawdown_hedge': return new DrawdownHedgeStrategy(inst);
       default: throw new Error(`Unknown strategy type: ${inst.strategyType}`);
     }
   }

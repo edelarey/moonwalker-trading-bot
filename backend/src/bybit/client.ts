@@ -2,6 +2,7 @@ import { RestClientV5 } from 'bybit-api';
 import { logger } from '../logger';
 import { Candle, CandleInterval } from '../types';
 import { resolveApiCredentials } from '../security/secrets';
+import { intervalToMs } from '../strategy/intervals';
 
 let _client: RestClientV5 | null = null;
 
@@ -34,12 +35,13 @@ export async function fetchCandles(
   interval: CandleInterval,
   limit = 200,
   startTime?: number,
-  endTime?: number
+  endTime?: number,
+  category: 'linear' | 'spot' = 'linear',
 ): Promise<Candle[]> {
   const client = getBybitClient();
   try {
     const params: Record<string, unknown> = {
-      category: 'linear',
+      category,
       symbol,
       interval,
       limit,
@@ -68,6 +70,117 @@ export async function fetchCandles(
     logger.error('fetchCandles error', { symbol, interval, err });
     throw err;
   }
+}
+
+export interface PremiumSnapshot {
+  symbol: string;
+  fundingRate: number;
+  markPrice: number;
+  indexPrice: number;
+  nextFundingTime: number;
+  basisPercent: number;
+}
+
+export async function fetchPremium(symbol: string): Promise<PremiumSnapshot> {
+  const client = getBybitClient();
+  const response = await client.getTickers({ category: 'linear', symbol });
+  if (response.retCode !== 0) throw new Error(response.retMsg);
+  const t = (response.result.list as any[])[0];
+  const mark = parseFloat(t.markPrice) || 0;
+  const index = parseFloat(t.indexPrice) || mark;
+  return {
+    symbol,
+    fundingRate: parseFloat(t.fundingRate) || 0,
+    markPrice: mark,
+    indexPrice: index,
+    nextFundingTime: parseInt(t.nextFundingTime, 10) || 0,
+    basisPercent: index ? ((mark - index) / index) * 100 : 0,
+  };
+}
+
+export async function fetchFundingHistory(
+  symbol: string,
+  startTime: number,
+  endTime: number,
+): Promise<Array<{ time: number; rate: number }>> {
+  const client = getBybitClient();
+  const out: Array<{ time: number; rate: number }> = [];
+  let cursor = startTime;
+  for (let i = 0; i < 20 && cursor < endTime; i++) {
+    const response = await client.getFundingRateHistory({
+      category: 'linear',
+      symbol,
+      startTime: cursor,
+      endTime,
+      limit: 200,
+    } as any);
+    if (response.retCode !== 0) break;
+    const list = (response.result.list as any[]) || [];
+    if (!list.length) break;
+    for (const row of list) {
+      out.push({
+        time: parseInt(row.fundingRateTimestamp, 10),
+        rate: parseFloat(row.fundingRate) || 0,
+      });
+    }
+    const oldest = Math.min(...list.map((r: any) => parseInt(r.fundingRateTimestamp, 10)));
+    const newest = Math.max(...list.map((r: any) => parseInt(r.fundingRateTimestamp, 10)));
+    if (newest <= cursor) break;
+    cursor = newest + 1;
+    if (list.length < 200) break;
+    void oldest;
+  }
+  const byT = new Map<number, number>();
+  for (const r of out) byT.set(r.time, r.rate);
+  return [...byT.entries()].map(([time, rate]) => ({ time, rate })).sort((a, b) => a.time - b.time);
+}
+
+const binanceCache = new Map<string, { price: number; at: number }>();
+
+export async function fetchBinanceLast(symbol: string): Promise<number | null> {
+  const hit = binanceCache.get(symbol);
+  if (hit && Date.now() - hit.at < 5_000) return hit.price;
+  try {
+    const res = await fetch(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${encodeURIComponent(symbol)}`);
+    if (!res.ok) return hit?.price ?? null;
+    const data = await res.json() as { price?: string };
+    const price = parseFloat(data.price || '');
+    if (!Number.isFinite(price)) return hit?.price ?? null;
+    binanceCache.set(symbol, { price, at: Date.now() });
+    return price;
+  } catch {
+    return hit?.price ?? null;
+  }
+}
+
+/** Page through Bybit klines so a multi-week range is not truncated at 1000 bars. */
+export async function fetchCandlesRange(
+  symbol: string,
+  interval: CandleInterval,
+  startTime: number,
+  endTime: number,
+  category: 'linear' | 'spot' = 'linear',
+): Promise<Candle[]> {
+  const step = intervalToMs(String(interval));
+  const out: Candle[] = [];
+  let cursor = startTime;
+  let guard = 0;
+  while (cursor < endTime && guard < 40) {
+    guard++;
+    const batch = await fetchCandles(symbol, interval, 1000, cursor, endTime, category);
+    if (!batch.length) break;
+    const fresh = batch.filter(c => c.openTime >= cursor && c.openTime < endTime);
+    if (!fresh.length) break;
+    out.push(...fresh);
+    const lastOpen = fresh[fresh.length - 1].openTime;
+    const next = lastOpen + step;
+    if (next <= cursor) break;
+    cursor = next;
+    if (batch.length < 1000) break;
+  }
+  const byTime = new Map<number, Candle>();
+  for (const c of out) byTime.set(c.openTime, c);
+  return [...byTime.values()].sort((a, b) => a.openTime - b.openTime);
 }
 
 /**

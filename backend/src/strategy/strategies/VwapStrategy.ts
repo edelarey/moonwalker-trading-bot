@@ -42,7 +42,7 @@ export class VwapStrategy implements IStrategy {
   }
 
   onCandle(symbol: string, candle: Candle, interval: string): StrategySignal | null {
-    if (interval !== this.params.timeframe) return null;
+    if (String(interval) !== String(this.params.timeframe)) return null;
     const day = this.dayKey(candle.openTime);
     let s = this.state.get(symbol);
     if (!s || s.day !== day) {

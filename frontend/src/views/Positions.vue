@@ -10,6 +10,7 @@ const config = useConfigStore()
 const filterMode = ref<'all' | 'paper' | 'live'>('all')
 const filterSymbol = ref('')
 const filterStrategy = ref('')
+const clearing = ref(false)
 
 onMounted(() => {
   trades.fetchPositions()
@@ -31,6 +32,12 @@ const filteredHistory = computed(() => history.value.filter(t => {
 async function close(symbol: string, side: string, qty: string, tradeId?: string) {
   if (!confirm(`Close ${symbol} position?`)) return
   await trades.closePosition(symbol, side, qty, tradeId)
+}
+
+async function clearHistory() {
+  if (!confirm('Clear all paper and live trade history? Open paper positions are dropped. Paper equity goes back to the starting balance. This cannot be undone.')) return
+  clearing.value = true
+  try { await trades.clearHistory() } finally { clearing.value = false }
 }
 </script>
 
@@ -102,10 +109,15 @@ async function close(symbol: string, side: string, qty: string, tradeId?: string
       <div class="card-body p-4">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
           <h2 class="card-title text-base">Trade history (kept locally, {{ history.length }})</h2>
-          <button class="btn btn-sm btn-outline" @click="tradesApi.exportCsv()">Export CSV</button>
+          <div class="flex gap-2">
+            <button class="btn btn-sm btn-outline" @click="tradesApi.exportCsv()">Export CSV</button>
+            <button class="btn btn-sm btn-error btn-outline" :disabled="clearing || history.length === 0" @click="clearHistory">
+              {{ clearing ? 'Clearing…' : 'Clear history' }}
+            </button>
+          </div>
         </div>
         <p class="text-xs text-base-content/50 mb-2">
-          Every paper and live fill is appended to <code>backend/data/trades.json</code> and is not deleted when you reset the paper account.
+          Paper and live fills are stored locally. Use <strong>Clear history</strong> when you want a clean book. That does not delete backtests.
         </p>
         <div class="flex flex-wrap gap-2 mb-3">
           <select v-model="filterMode" class="select select-bordered select-xs">
@@ -131,7 +143,11 @@ async function close(symbol: string, side: string, qty: string, tradeId?: string
               <TradeRow v-for="t in filteredHistory" :key="t.id" :trade="t" />
             </tbody>
           </table>
-          <p v-else class="text-center text-base-content/40 py-4 text-sm">No trades yet</p>
+          <p v-else class="text-center text-base-content/40 py-4 text-sm">
+            No paper or live fills yet. History is only written when <strong>Auto</strong> is on and a signal fills.
+            Backtests do not appear here — open <router-link to="/backtest/results" class="link">BT Results</router-link>
+            or <router-link to="/strategies/results" class="link">Strategy Results</router-link>.
+          </p>
         </div>
       </div>
     </div>

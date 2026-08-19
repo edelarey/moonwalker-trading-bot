@@ -18,6 +18,8 @@ const DEFAULT_CONFIG: AppConfig = {
     'OPUSDT', 'INJUSDT', 'SUIUSDT', 'TIAUSDT', 'SEIUSDT',
   ].map(symbol => ({ symbol, enabled: true, addedAt: Date.now() })),
   riskPercent: 1,
+  sizingMode: 'risk_percent',
+  fixedPositionUsdt: 100,
   tpMultiplier: 2.5,
   liquidityWindowStart: '00:00',
   liquidityWindowEnd: '04:00',
@@ -71,6 +73,22 @@ const DEFAULT_CONFIG: AppConfig = {
     orb: {
       rangeMinutes: 30, timeframe: '5', breakoutBufferPercent: 0.08,
       takeProfitRr: 2, sessionStartHour: 0, maxTradesPerDay: 1,
+    },
+    funding_arb: {
+      timeframe: '60', minFundingRate: 0.0001, exitFundingRate: 0.00003,
+      maxBasisPercent: 0.2, stopBasisPercent: 0.5,
+    },
+    cross_exchange: {
+      timeframe: '5', minSpreadPercent: 0.04, exitSpreadPercent: 0.015,
+      stopSpreadPercent: 0.2, maxHoldMinutes: 60,
+    },
+    dynamic_delta: {
+      timeframe: '15', hedgeSymbol: 'BTCUSDT', deltaThresholdPercent: 8,
+      volTriggerPercent: 1.2, hedgeRatio: 0.5, inventoryUsdt: 2000,
+    },
+    drawdown_hedge: {
+      timeframe: '15', hedgeSymbol: 'BTCUSDT', drawdownPercent: 3,
+      recoverPercent: 1.2, hedgePortion: 0.5,
     },
   },
 };

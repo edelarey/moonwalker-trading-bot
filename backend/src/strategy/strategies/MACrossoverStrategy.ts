@@ -8,9 +8,9 @@
  * - Optional RSI confirmation filter
  */
 import { IStrategy, BacktestStrategyParams, StrategyBacktestResult } from '../IStrategy';
-import { Candle, StrategySignal, StrategyInstance, MACrossoverParams, Trade } from '../../types';
-import { v4 as uuidv4 } from 'uuid';
+import { Candle, StrategySignal, StrategyInstance, MACrossoverParams } from '../../types';
 import { logger } from '../../logger';
+import { runSignalBacktest } from '../backtestUtils';
 
 function sma(values: number[], period: number): number | null {
   if (values.length < period) return null;
@@ -50,7 +50,7 @@ export class MACrossoverStrategy implements IStrategy {
   }
 
   onCandle(symbol: string, candle: Candle, interval: string): StrategySignal | null {
-    if (interval !== this.params.timeframe) return null;
+    if (String(interval) !== String(this.params.timeframe)) return null;
     const closes = this.closes.get(symbol) ?? [];
     closes.push(candle.close);
     if (closes.length > this.params.longPeriod + 10) closes.shift();
@@ -88,42 +88,14 @@ export class MACrossoverStrategy implements IStrategy {
     return null;
   }
 
-  async backtest(params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
-    const { fetchCandles } = await import('../../bybit/client');
-    const startMs = new Date(params.startDate + 'T00:00:00Z').getTime();
-    const endMs = new Date(params.endDate + 'T00:00:00Z').getTime() + 86400000;
+  backtest(params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
     const p = params.params as unknown as MACrossoverParams;
-    const trades: Trade[] = [];
-    let equity = params.startingEquity;
-    const equityCurve = [{ time: startMs, equity }];
-
-    for (const symbol of params.symbols) {
-      const candles = await fetchCandles(symbol, (p.timeframe || '60') as any, 1000, startMs, endMs);
-      const inst = new MACrossoverStrategy({ ...this.instance, params: params.params });
-      let entryPrice = 0, entryTime = 0;
-      for (const c of candles) {
-        const sig = inst.onCandle(symbol, c, p.timeframe || '60');
-        if (sig?.type === 'entry') { entryPrice = sig.price; entryTime = c.openTime; }
-        if (sig?.type === 'exit' && entryPrice > 0) {
-          const posSize = (equity * params.riskPercent) / 100;
-          const pnl = ((sig.price - entryPrice) / entryPrice) * posSize;
-          trades.push({ id: uuidv4(), symbol, direction: 'bullish', entryPrice, closePrice: sig.price, pnl, pnlPercent: (pnl / equity) * 100, stopLoss: entryPrice * (1 - p.stopLossPercent / 100), takeProfit: entryPrice * (1 + p.takeProfitPercent / 100), riskDistance: entryPrice * p.stopLossPercent / 100, riskPercent: params.riskPercent, positionSize: posSize, qty: posSize / entryPrice, openedAt: entryTime, closedAt: c.openTime, status: pnl > 0 ? 'closed_tp' : 'closed_sl', isBacktest: true, patternType: 'ma_crossover' as any, dailyHigh: c.high, dailyLow: c.low });
-          equity += pnl;
-          equityCurve.push({ time: c.openTime, equity });
-          entryPrice = 0;
-        }
-      }
-    }
-    return { strategyType: 'ma_crossover', instanceName: this.instance.name, trades, summary: calcSummary(trades, params.startingEquity, equity), equityCurve };
+    return runSignalBacktest({
+      strategyType: 'ma_crossover',
+      instance: this.instance,
+      params,
+      create: inst => new MACrossoverStrategy(inst),
+      timeframe: String(p.timeframe || '240'),
+    });
   }
-}
-
-function calcSummary(trades: Trade[], startEquity: number, endEquity: number): import('../../types').BacktestSummary {
-  const winners = trades.filter(t => (t.pnl ?? 0) > 0);
-  const losers = trades.filter(t => (t.pnl ?? 0) <= 0);
-  const gp = winners.reduce((s, t) => s + (t.pnl ?? 0), 0);
-  const gl = Math.abs(losers.reduce((s, t) => s + (t.pnl ?? 0), 0));
-  let peak = startEquity, eq = startEquity, maxDD = 0;
-  for (const t of trades) { eq += t.pnl ?? 0; if (eq > peak) peak = eq; const dd = peak - eq; if (dd > maxDD) maxDD = dd; }
-  return { totalTrades: trades.length, winningTrades: winners.length, losingTrades: losers.length, winRate: trades.length > 0 ? winners.length / trades.length : 0, profitFactor: gl > 0 ? gp / gl : gp > 0 ? Infinity : 0, totalPnl: endEquity - startEquity, maxDrawdown: maxDD, maxDrawdownPercent: (maxDD / startEquity) * 100, avgRR: 0, startingEquity: startEquity, endingEquity: endEquity };
 }

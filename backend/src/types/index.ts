@@ -57,6 +57,7 @@ export interface ReversalSignal {
 export type TradeStatus = 'open' | 'closed_tp' | 'closed_sl' | 'closed_manual';
 export type TradingMode = 'paper' | 'live';
 export type TradeMode = 'paper' | 'live' | 'backtest';
+export type SizingMode = 'risk_percent' | 'fixed_usdt';
 
 export interface Trade {
   id: string;
@@ -99,7 +100,9 @@ export interface StrategyDefaults {
 
 export interface AppConfig {
   symbols: SymbolConfig[];
-  riskPercent: number;       // default 1
+  riskPercent: number;       // default 1 — used when sizingMode is risk_percent
+  sizingMode?: SizingMode;
+  fixedPositionUsdt?: number; // notional USDT per trade when sizingMode is fixed_usdt
   tpMultiplier: number;      // default 2.5
   liquidityWindowStart: string;  // HH:MM UTC, default "00:00"
   liquidityWindowEnd: string;    // HH:MM UTC, default "02:30"
@@ -168,6 +171,9 @@ export interface BacktestResult {
   trades: Trade[];
   summary: BacktestSummary;
   runAt: number;
+  strategyType?: string;
+  instanceName?: string;
+  instanceId?: string;
 }
 
 export interface BacktestSummary {
@@ -199,7 +205,11 @@ export type StrategyType =
   | 'ema_pullback'
   | 'supertrend'
   | 'vwap'
-  | 'orb';
+  | 'orb'
+  | 'funding_arb'
+  | 'cross_exchange'
+  | 'dynamic_delta'
+  | 'drawdown_hedge';
 
 export const MAX_ENABLED_SYMBOLS = 50;
 
@@ -215,6 +225,10 @@ export const ALL_STRATEGY_TYPES: StrategyType[] = [
   'supertrend',
   'vwap',
   'orb',
+  'funding_arb',
+  'cross_exchange',
+  'dynamic_delta',
+  'drawdown_hedge',
 ];
 
 export interface StrategySignal {
@@ -343,7 +357,43 @@ export interface VwapParams {
   sessionResetHour: number;
 }
 
-// Opening Range Breakout
+export interface FundingArbParams {
+  [key: string]: unknown;
+  timeframe: string;
+  minFundingRate: number;
+  exitFundingRate: number;
+  maxBasisPercent: number;
+  stopBasisPercent: number;
+}
+
+export interface CrossExchangeParams {
+  [key: string]: unknown;
+  timeframe: string;
+  minSpreadPercent: number;
+  exitSpreadPercent: number;
+  stopSpreadPercent: number;
+  maxHoldMinutes: number;
+}
+
+export interface DynamicDeltaParams {
+  [key: string]: unknown;
+  timeframe: string;
+  hedgeSymbol: string;
+  deltaThresholdPercent: number;
+  volTriggerPercent: number;
+  hedgeRatio: number;
+  inventoryUsdt: number;
+}
+
+export interface DrawdownHedgeParams {
+  [key: string]: unknown;
+  timeframe: string;
+  hedgeSymbol: string;
+  drawdownPercent: number;
+  recoverPercent: number;
+  hedgePortion: number;
+}
+
 export interface OrbParams {
   [key: string]: unknown;
   rangeMinutes: number;

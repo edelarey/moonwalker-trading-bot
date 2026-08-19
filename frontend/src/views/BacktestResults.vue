@@ -20,11 +20,23 @@ function selectResult(id: string) {
 
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-2">
       <h1 class="text-2xl font-bold">Backtest Results</h1>
-      <button v-if="result" class="btn btn-sm btn-outline" @click="backtestApi.exportCsv(result!.id)">
-        Export CSV
-      </button>
+      <div class="flex gap-2">
+        <button v-if="result" class="btn btn-sm btn-outline" @click="backtestApi.exportCsv(result!.id)">
+          Export CSV
+        </button>
+        <button v-if="result" class="btn btn-sm btn-outline btn-error" @click="store.removeOne(result!.id)">
+          Delete this run
+        </button>
+        <button
+          v-if="store.results.length"
+          class="btn btn-sm btn-error"
+          @click="confirm('Clear all saved backtests? This cannot be undone.') && store.clearAll()"
+        >
+          Clear all backtests
+        </button>
+      </div>
     </div>
 
     <!-- Result Selector -->
@@ -36,12 +48,12 @@ function selectResult(id: string) {
         :class="result?.id === r.id ? 'btn-primary' : 'btn-outline'"
         @click="selectResult(r.id)"
       >
-        {{ new Date(r.runAt).toLocaleDateString() }} — {{ r.params.symbols.slice(0, 3).join(',') }}
+        {{ new Date(r.runAt).toLocaleDateString() }} — {{ r.instanceName || 'B&B' }} — {{ r.params.symbols.slice(0, 3).join(',') }}
       </button>
     </div>
 
     <div v-if="!result" class="text-center text-base-content/40 py-20 text-lg">
-      No backtest results yet. Run a backtest first.
+      No saved backtests yet. Run one from Backtest or Strategy Manager — results are stored on disk and survive a refresh.
     </div>
 
     <template v-else>
