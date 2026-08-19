@@ -29,7 +29,7 @@ export class GridStrategy implements IStrategy {
 
   describe(): string { return `Grid Trading: ${this.params.gridCount} grids between ${this.params.lowerPrice} and ${this.params.upperPrice}.`; }
   defaultParams(): GridParams {
-    return { upperPrice: 0, lowerPrice: 0, gridCount: 10, investmentPerGrid: 100, geometric: false, stopLossBreakoutPercent: 5, leverage: 1 };
+    return { upperPrice: 0, lowerPrice: 0, gridCount: 12, investmentPerGrid: 50, geometric: true, stopLossBreakoutPercent: 4, leverage: 1 };
   }
 
   private buildGrid(upper: number, lower: number): number[] {

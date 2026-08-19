@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useBacktestStore } from '@/stores/backtest'
-import { useStrategiesStore, type StrategyInstance } from '@/stores/strategies'
+import { useStrategiesStore, instanceType, type StrategyInstance } from '@/stores/strategies'
 import { useRouter, useRoute } from 'vue-router'
 
 const config = useConfigStore()
@@ -89,7 +89,7 @@ async function run() {
       strategiesStore.addBacktestResult(
         selectedInstance.value.id,
         selectedInstance.value.name,
-        selectedInstance.value.type,
+        instanceType(selectedInstance.value),
         {
           totalTrades: result.totalTrades ?? 0,
           winRate: result.winRate ?? 0,
@@ -170,7 +170,7 @@ function formatParamKey(key: string): string {
                 <select class="select select-bordered" v-model="selectedInstanceId">
                   <option value="">— Select a strategy —</option>
                   <option v-for="inst in strategiesStore.instances" :key="inst.id" :value="inst.id">
-                    {{ inst.name }} ({{ inst.type }})
+                    {{ inst.name }} ({{ instanceType(inst) }})
                   </option>
                 </select>
               </label>

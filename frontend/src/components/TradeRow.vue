@@ -14,7 +14,11 @@ function pnlClass(pnl?: number) {
 
 <template>
   <tr class="hover">
-    <td class="font-mono text-sm">{{ trade.symbol }}</td>
+    <td class="font-mono text-sm">
+      {{ trade.symbol }}
+      <span v-if="trade.mode === 'paper'" class="badge badge-info badge-xs ml-1">P</span>
+      <span v-else-if="trade.mode === 'live'" class="badge badge-error badge-xs ml-1">L</span>
+    </td>
     <td>
       <span :class="trade.direction === 'bullish' ? 'badge-bullish' : 'badge-bearish'">
         {{ trade.direction === 'bullish' ? '▲ Long' : '▼ Short' }}
@@ -26,6 +30,7 @@ function pnlClass(pnl?: number) {
     <td :class="pnlClass(trade.pnl)" class="font-mono">
       {{ trade.pnl !== undefined ? (trade.pnl > 0 ? '+' : '') + trade.pnl.toFixed(2) : '—' }}
     </td>
+    <td class="text-xs text-base-content/60">{{ trade.strategyType || trade.patternType || '—' }}</td>
     <td>
       <span class="badge badge-sm" :class="{
         'badge-warning': trade.status === 'open',

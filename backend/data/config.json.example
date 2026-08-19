@@ -6,49 +6,16 @@
   "riskPercent": 1,
   "tpMultiplier": 2.5,
   "liquidityWindowStart": "00:00",
-  "liquidityWindowEnd": "02:30",
+  "liquidityWindowEnd": "04:00",
   "maxDailyTradesPerCoin": 1,
   "storageMode": "json",
   "testnet": true,
-  "breakoutBufferPercent": 0.05,
+  "tradingMode": "paper",
+  "paperStartingEquity": 10000,
+  "paperFeeBps": 6,
+  "paperSlippageBps": 3,
+  "breakoutBufferPercent": 0.08,
   "primaryTimeframe": "D",
   "breakoutTimeframe": "15",
-  "entryTimeframe": "5",
-  "strategyDefaults": {
-    "break_bounce": {
-      "primaryTimeframe": "1d",
-      "breakoutTimeframe": "15",
-      "entryTimeframe": "5"
-    },
-    "dca": {
-      "investmentAmount": 100,
-      "intervalHours": 24,
-      "maxPositions": 5,
-      "takeProfitPct": 5,
-      "stopLossPct": 3
-    },
-    "grid": {
-      "upperPrice": 0,
-      "lowerPrice": 0,
-      "gridLevels": 10,
-      "investmentPerGrid": 50
-    },
-    "ma_crossover": {
-      "fastPeriod": 9,
-      "slowPeriod": 21,
-      "signalPeriod": 9,
-      "timeframe": "15"
-    },
-    "rsi": {
-      "period": 14,
-      "overbought": 70,
-      "oversold": 30,
-      "timeframe": "15"
-    },
-    "bollinger": {
-      "period": 20,
-      "stdDev": 2,
-      "timeframe": "15"
-    }
-  }
+  "entryTimeframe": "5"
 }

@@ -6,6 +6,7 @@ import { DailyRange } from '../types';
 
 let engine: import('../strategy/breakBounce').BreakBounceEngine | null = null;
 let symbols: string[] = [];
+const jobs: cron.ScheduledTask[] = [];
 
 export function initScheduler(
   breakBounceEngine: import('../strategy/breakBounce').BreakBounceEngine,
@@ -14,12 +15,18 @@ export function initScheduler(
   engine = breakBounceEngine;
   symbols = enabledSymbols;
 
-  // Run at UTC midnight every day: refresh all daily ranges
-  cron.schedule('0 0 * * *', async () => {
+  jobs.push(cron.schedule('0 0 * * *', async () => {
     await refreshDailyRanges();
-  }, { timezone: 'UTC' });
+  }, { timezone: 'UTC' }));
 
   logger.info('Scheduler initialized — daily range refresh at UTC 00:00');
+}
+
+export function stopScheduler(): void {
+  for (const job of jobs) {
+    try { job.stop(); } catch { /* already stopped */ }
+  }
+  jobs.length = 0;
 }
 
 export async function refreshDailyRanges(): Promise<void> {

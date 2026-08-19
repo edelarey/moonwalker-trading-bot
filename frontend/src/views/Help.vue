@@ -99,6 +99,43 @@ const faqs = [
       </div>
     </details>
 
+    <details class="group bg-base-200 border border-base-300 rounded-xl overflow-hidden">
+      <summary class="flex items-center justify-between px-5 py-4 cursor-pointer font-semibold text-base select-none list-none hover:bg-base-300 transition-colors">
+        <span>📄 Paper Trading</span>
+        <span class="text-lg transition-transform duration-200 group-open:rotate-180">▼</span>
+      </summary>
+      <div class="px-5 pb-5 pt-3 border-t border-base-300 space-y-3 text-sm text-base-content/80">
+        <ol class="list-decimal list-inside space-y-1">
+          <li>Leave Trading Mode on <strong>Paper</strong> in Settings (default).</li>
+          <li>In Strategy Manager, pick one strategy and one liquid symbol (BTCUSDT).</li>
+          <li>Click <strong>Deploy paper</strong> — that enables the strategy and Auto-execute.</li>
+          <li>For Break &amp; Bounce, also turn AUTO on in Trading.</li>
+          <li>Watch Positions: a signal should open a paper fill, then SL/TP close it on later candles.</li>
+          <li>Compare with a historical backtest on the same params before considering Live.</li>
+        </ol>
+        <p class="text-xs text-base-content/60">Paper fills use the last close plus configured fee and slippage. If a candle tags both SL and TP, the stop is filled (conservative).</p>
+      </div>
+    </details>
+
+    <details class="group bg-base-200 border border-base-300 rounded-xl overflow-hidden">
+      <summary class="flex items-center justify-between px-5 py-4 cursor-pointer font-semibold text-base select-none list-none hover:bg-base-300 transition-colors">
+        <span>🤖 Extra strategies</span>
+        <span class="text-lg transition-transform duration-200 group-open:rotate-180">▼</span>
+      </summary>
+      <div class="px-5 pb-5 pt-3 border-t border-base-300 overflow-x-auto">
+        <table class="table table-sm">
+          <thead><tr><th>Type</th><th>Idea</th></tr></thead>
+          <tbody>
+            <tr><td class="font-mono text-xs">donchian</td><td class="text-xs">Turtle-style channel breakout with ATR stops. Trend-following edge on crypto (Donchian ensembles have published alpha vs BTC).</td></tr>
+            <tr><td class="font-mono text-xs">ema_pullback</td><td class="text-xs">9/21 EMA trend; enter when price tags the fast EMA and closes back with the trend. Less noisy than a raw crossover.</td></tr>
+            <tr><td class="font-mono text-xs">supertrend</td><td class="text-xs">ATR trailing band. Stay in the move until the band flips.</td></tr>
+            <tr><td class="font-mono text-xs">vwap</td><td class="text-xs">Fade extensions away from the UTC-session VWAP; target is VWAP itself.</td></tr>
+            <tr><td class="font-mono text-xs">orb</td><td class="text-xs">First N minutes after UTC midnight set a range; trade the first close beyond it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
     <!-- Live Trading Controls -->
     <details class="group bg-base-200 border border-base-300 rounded-xl overflow-hidden">
       <summary class="flex items-center justify-between px-5 py-4 cursor-pointer font-semibold text-base select-none list-none hover:bg-base-300 transition-colors">
@@ -117,9 +154,9 @@ const faqs = [
           </div>
         </div>
         <div class="p-4 rounded-lg bg-base-300 space-y-2">
-          <p class="font-semibold text-sm">🧪 Testnet vs Mainnet</p>
-          <p class="text-xs text-base-content/70">The TESTNET / MAINNET badge in the Dashboard header shows which mode is active. Testnet uses Bybit's paper trading environment — no real money. Always start with testnet. The toggle is in <strong>Settings</strong>.</p>
-          <p class="text-xs text-loss font-medium mt-1">⚠ Never switch to mainnet without first running backtests and paper trading successfully.</p>
+          <p class="font-semibold text-sm">📄 Paper vs Testnet vs Live</p>
+          <p class="text-xs text-base-content/70"><strong>Paper</strong> (default) uses live Bybit prices and simulates fills, fees, and SL/TP locally. No API keys and no orders. <strong>Bybit testnet</strong> is a separate exchange sandbox — only used if Trading Mode is Live and <code>BYBIT_TESTNET=true</code>. <strong>Live</strong> sends real orders. Switch modes in <strong>Settings</strong>.</p>
+          <p class="text-xs text-loss font-medium mt-1">⚠ Stay in paper until a strategy shows stable paper results. Type LIVE in Settings to leave paper mode.</p>
         </div>
       </div>
     </details>

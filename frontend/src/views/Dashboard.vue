@@ -25,14 +25,20 @@ const pnlDisplay = computed(() => (trades.totalPnl >= 0 ? '+' : '') + trades.tot
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-bold">Dashboard</h1>
       <div class="flex gap-2">
+        <span v-if="(config.config?.tradingMode ?? 'paper') === 'paper'" class="badge badge-info">PAPER</span>
+        <span v-else class="badge badge-error animate-pulse">LIVE</span>
         <span v-if="config.config?.testnet" class="badge badge-warning">TESTNET</span>
-        <span v-else class="badge badge-error">MAINNET</span>
+        <span v-else class="badge badge-neutral">MAINNET DATA</span>
       </div>
     </div>
 
     <!-- Stats Row -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard title="Account Equity" :value="'$' + trades.equity.toFixed(2)" icon="💰" />
+      <StatCard
+        :title="(config.config?.tradingMode ?? 'paper') === 'paper' ? 'Paper Equity' : 'Account Equity'"
+        :value="'$' + trades.equity.toFixed(2)"
+        icon="💰"
+      />
       <StatCard title="Total P&L" :value="pnlDisplay" :trend="totalPnlSign" icon="📈" />
       <StatCard title="Win Rate" :value="winRatePct" icon="🎯" />
       <StatCard title="Active Breakouts" :value="market.breakouts.length" icon="🔥" />
@@ -42,7 +48,10 @@ const pnlDisplay = computed(() => (trades.totalPnl >= 0 ? '+' : '') + trades.tot
     <div class="card bg-base-200 border border-base-300">
       <div class="card-body p-4">
         <h2 class="card-title text-base mb-2">Equity Curve</h2>
-        <EquityCurve :trades="trades.closedTrades" :starting-equity="10000" />
+        <EquityCurve
+          :trades="trades.closedTrades.filter(t => !t.isBacktest)"
+          :starting-equity="trades.paper?.startingEquity ?? 10000"
+        />
       </div>
     </div>
 
@@ -85,7 +94,7 @@ const pnlDisplay = computed(() => (trades.totalPnl >= 0 ? '+' : '') + trades.tot
         <div class="overflow-x-auto">
           <table v-if="trades.trades.length" class="table table-sm">
             <thead><tr>
-              <th>Symbol</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>PnL</th><th>Status</th><th>Time</th>
+              <th>Symbol</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>PnL</th><th>Strategy</th><th>Status</th><th>Time</th>
             </tr></thead>
             <tbody>
               <TradeRow v-for="t in trades.trades.slice(0, 5)" :key="t.id" :trade="t" />

@@ -10,6 +10,11 @@ const typeBadgeClass: Record<StrategyType, string> = {
   ma_crossover: 'badge-info',
   rsi: 'badge-warning',
   bollinger: 'badge-success',
+  donchian: 'badge-primary',
+  ema_pullback: 'badge-info',
+  supertrend: 'badge-accent',
+  vwap: 'badge-secondary',
+  orb: 'badge-warning',
 }
 </script>
 

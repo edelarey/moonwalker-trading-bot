@@ -44,7 +44,7 @@ export class RSIStrategy implements IStrategy {
 
   describe(): string { return `RSI Mean-Reversion: Buy when RSI < ${this.params.oversoldThreshold}, sell when RSI > ${this.params.overboughtThreshold}.`; }
   defaultParams(): RSIParams {
-    return { period: 14, oversoldThreshold: 30, overboughtThreshold: 70, timeframe: '60', confirmationCandles: 1, stopLossPercent: 3, takeProfitPercent: 6 };
+    return { period: 14, oversoldThreshold: 20, overboughtThreshold: 80, timeframe: '60', confirmationCandles: 2, stopLossPercent: 2.5, takeProfitPercent: 5 };
   }
 
   onCandle(symbol: string, candle: Candle, interval: string): StrategySignal | null {

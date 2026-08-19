@@ -1,11 +1,27 @@
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { StrategyInstance, StrategyType } from '../types';
+import { ALL_STRATEGY_TYPES, StrategyInstance, StrategyType } from '../types';
 import { loadConfig } from '../config';
 import { logger } from '../logger';
+import { strategyRegistry } from '../strategy/registry';
+import { normalizeInstance } from '../strategy/params';
 
 const dataDir = path.join(__dirname, '..', '..', 'data');
+
+const TYPE_NAMES: Record<StrategyType, string> = {
+  break_bounce: 'Default Break & Bounce',
+  dca: 'Default DCA',
+  grid: 'Default Grid',
+  ma_crossover: 'Default MA Crossover',
+  rsi: 'Default RSI',
+  bollinger: 'Default Bollinger',
+  donchian: 'Default Donchian Breakout',
+  ema_pullback: 'Default EMA Pullback',
+  supertrend: 'Default Supertrend',
+  vwap: 'Default VWAP Fade',
+  orb: 'Default Opening Range Breakout',
+};
 
 function ensureDir(): void {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -24,15 +40,23 @@ function writeJson<T>(filename: string, data: T): void {
 }
 
 export function getStrategyInstances(): StrategyInstance[] {
-  return readJson<StrategyInstance[]>('strategy-instances.json', []);
+  return readJson<StrategyInstance[]>('strategy-instances.json', []).map(inst => {
+    const anyInst = inst as StrategyInstance & { type?: StrategyType };
+    return normalizeInstance({
+      ...inst,
+      strategyType: inst.strategyType || anyInst.type || 'break_bounce',
+      autoMode: inst.autoMode ?? false,
+    });
+  });
 }
 
 export function saveStrategyInstance(inst: StrategyInstance): void {
   const list = getStrategyInstances();
-  const idx = list.findIndex(s => s.id === inst.id);
-  if (idx >= 0) list[idx] = inst; else list.push(inst);
+  const normalized = normalizeInstance(inst);
+  const idx = list.findIndex(s => s.id === normalized.id);
+  if (idx >= 0) list[idx] = normalized; else list.push(normalized);
   writeJson('strategy-instances.json', list);
-  logger.debug('Strategy instance saved', { id: inst.id });
+  logger.debug('Strategy instance saved', { id: normalized.id });
 }
 
 export function deleteStrategyInstance(id: string): void {
@@ -43,30 +67,27 @@ export function deleteStrategyInstance(id: string): void {
 
 export async function seedDefaultStrategies(): Promise<void> {
   const existing = getStrategyInstances();
-  if (existing.length > 0) return;
-
+  const have = new Set(existing.map(s => s.strategyType));
   const config = loadConfig();
-  const defaults = config.strategyDefaults;
-  if (!defaults) {
-    logger.warn('seedDefaultStrategies: no strategyDefaults found in config, skipping seed');
-    return;
+  const defaults = config.strategyDefaults ?? {};
+  let added = 0;
+  let refreshed = 0;
+
+  for (const inst of existing) {
+    if (inst.name !== TYPE_NAMES[inst.strategyType]) continue;
+    const next = (defaults[inst.strategyType] as Record<string, unknown> | undefined)
+      ?? strategyRegistry.getDefaultParams(inst.strategyType);
+    saveStrategyInstance({ ...inst, params: next, updatedAt: Date.now() });
+    refreshed++;
   }
 
-  const types: StrategyType[] = ['break_bounce', 'dca', 'grid', 'ma_crossover', 'rsi', 'bollinger'];
-  const names: Record<StrategyType, string> = {
-    break_bounce: 'Default Break & Bounce',
-    dca: 'Default DCA',
-    grid: 'Default Grid',
-    ma_crossover: 'Default MA Crossover',
-    rsi: 'Default RSI',
-    bollinger: 'Default Bollinger',
-  };
-
-  for (const type of types) {
-    const params = defaults[type] as Record<string, unknown>;
+  for (const type of ALL_STRATEGY_TYPES) {
+    if (have.has(type)) continue;
+    const params = (defaults[type] as Record<string, unknown> | undefined)
+      ?? strategyRegistry.getDefaultParams(type);
     const inst: StrategyInstance = {
       id: uuidv4(),
-      name: names[type],
+      name: TYPE_NAMES[type],
       strategyType: type,
       symbols: [],
       params,
@@ -76,7 +97,10 @@ export async function seedDefaultStrategies(): Promise<void> {
       updatedAt: Date.now(),
     };
     saveStrategyInstance(inst);
+    added++;
   }
 
-  logger.info('seedDefaultStrategies: seeded 6 default strategy instances from config');
+  if (added > 0 || refreshed > 0) {
+    logger.info('seedDefaultStrategies: synced factory defaults', { added, refreshed });
+  }
 }

@@ -6,36 +6,49 @@
 import { EventEmitter } from 'events';
 import { IStrategy, BacktestStrategyParams, StrategyBacktestResult } from './IStrategy';
 import { StrategyInstance, StrategyType, Candle } from '../types';
+import { loadConfig } from '../config';
+import { instanceTimeframe, normalizeInstance } from './params';
 import { DCAStrategy } from './strategies/DCAStrategy';
 import { MACrossoverStrategy } from './strategies/MACrossoverStrategy';
 import { RSIStrategy } from './strategies/RSIStrategy';
 import { BollingerStrategy } from './strategies/BollingerStrategy';
 import { GridStrategy } from './strategies/GridStrategy';
+import { DonchianStrategy } from './strategies/DonchianStrategy';
+import { EmaPullbackStrategy } from './strategies/EmaPullbackStrategy';
+import { SupertrendStrategy } from './strategies/SupertrendStrategy';
+import { VwapStrategy } from './strategies/VwapStrategy';
+import { OrbStrategy } from './strategies/OrbStrategy';
+import { BreakBounceStrategy } from './strategies/BreakBounceStrategy';
 import { logger } from '../logger';
 
 export class StrategyRegistry extends EventEmitter {
   private strategies: Map<string, IStrategy> = new Map();
 
-  /**
-   * Instantiate a strategy from a StrategyInstance config.
-   */
   createStrategy(instance: StrategyInstance): IStrategy {
-    switch (instance.strategyType) {
-      case 'dca': return new DCAStrategy(instance);
-      case 'ma_crossover': return new MACrossoverStrategy(instance);
-      case 'rsi': return new RSIStrategy(instance);
-      case 'bollinger': return new BollingerStrategy(instance);
-      case 'grid': return new GridStrategy(instance);
-      default: throw new Error(`Unknown strategy type: ${instance.strategyType}`);
+    const inst = normalizeInstance(instance);
+    switch (inst.strategyType) {
+      case 'break_bounce': return new BreakBounceStrategy(inst);
+      case 'dca': return new DCAStrategy(inst);
+      case 'ma_crossover': return new MACrossoverStrategy(inst);
+      case 'rsi': return new RSIStrategy(inst);
+      case 'bollinger': return new BollingerStrategy(inst);
+      case 'grid': return new GridStrategy(inst);
+      case 'donchian': return new DonchianStrategy(inst);
+      case 'ema_pullback': return new EmaPullbackStrategy(inst);
+      case 'supertrend': return new SupertrendStrategy(inst);
+      case 'vwap': return new VwapStrategy(inst);
+      case 'orb': return new OrbStrategy(inst);
+      default: throw new Error(`Unknown strategy type: ${inst.strategyType}`);
     }
   }
 
-  /**
-   * Register an active strategy instance.
-   */
   register(strategy: IStrategy): void {
     this.strategies.set(strategy.id, strategy);
-    logger.info('Strategy registered', { id: strategy.id, type: strategy.instance.strategyType, name: strategy.instance.name });
+    logger.info('Strategy registered', {
+      id: strategy.id,
+      type: strategy.instance.strategyType,
+      name: strategy.instance.name,
+    });
   }
 
   unregister(id: string): void {
@@ -50,12 +63,15 @@ export class StrategyRegistry extends EventEmitter {
     return Array.from(this.strategies.values());
   }
 
-  /**
-   * Route a candle update to all registered strategies that subscribe to this symbol+interval.
-   */
   routeCandle(symbol: string, candle: Candle, interval: string): void {
+    const config = loadConfig();
     for (const strategy of this.strategies.values()) {
       try {
+        const inst = strategy.instance;
+        if (inst.symbols.length && !inst.symbols.includes(symbol)) continue;
+        const tf = instanceTimeframe(inst);
+        if (tf && tf !== interval) continue;
+        if (!tf && interval !== config.entryTimeframe) continue;
         const sig = strategy.onCandle(symbol, candle, interval);
         if (sig) {
           this.emit('signal', { strategyId: strategy.id, signal: sig });
@@ -67,21 +83,17 @@ export class StrategyRegistry extends EventEmitter {
     }
   }
 
-  /**
-   * Run a backtest for a given strategy type and params.
-   */
   async runBacktest(instance: StrategyInstance, params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
     const strategy = this.createStrategy(instance);
     return strategy.backtest(params);
   }
 
-  /**
-   * Return default params for a strategy type.
-   */
   getDefaultParams(strategyType: StrategyType): Record<string, unknown> {
-    const dummy: StrategyInstance = { id: 'dummy', name: '', strategyType, symbols: [], params: {}, enabled: false, autoMode: false, createdAt: 0, updatedAt: 0 };
-    const s = this.createStrategy(dummy);
-    return s.defaultParams();
+    const dummy: StrategyInstance = {
+      id: 'dummy', name: '', strategyType, symbols: [], params: {},
+      enabled: false, autoMode: false, createdAt: 0, updatedAt: 0,
+    };
+    return this.createStrategy(dummy).defaultParams();
   }
 }
 

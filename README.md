@@ -1,334 +1,319 @@
 # 🌙 Moonwalker Trading Bot
 
-A full-stack, production-ready GUI trading application implementing the **Break & Bounce scalping strategy** (pure price-action, no indicators) for Bybit USDT perpetual futures.
+A Vue + Node app for testing and running multiple strategies on **Bybit USDT perpetual futures**. It starts in **paper mode**: live market data, simulated fills, no orders. Switch to live only after you have saved a sub-account key locally and typed `LIVE` in Settings.
 
-> ⚠️ **Risk Warning**: Trading cryptocurrencies involves significant risk. This software is for educational purposes. Always test on **testnet** first. Never risk more than you can afford to lose.
-
----
-
-## 📐 Strategy: Break & Bounce
-
-Pure price-action scalping on Bybit USDT perpetuals.
-
-| Rule | Description |
-|------|-------------|
-| **1. Daily Blueprint** | At UTC 00:00, fetch & store previous day's high & low for every coin |
-| **2. 15m Breakout** | A full 15m candle must close clearly above prev day high (bullish) or below prev day low (bearish) |
-| **3. 5m Retest + Reversal** | After breakout, wait for price to retest the broken level. Enter on a valid reversal candle (Hammer, Engulfing, Shooting Star) closing on the 5m chart |
-| **4. Risk Management** | SL = beyond reversal candle extreme · TP = 2.5× risk · Max 1 trade/coin/day · Liquidity window only (default UTC 00:00–02:30) |
+> ⚠️ **Risk warning.** Crypto trading can lose money quickly. Defaults are starting points, not an edge. Paper first. Never risk more than you can afford to lose. Not financial advice.
 
 ---
 
-## 🏗️ Architecture
+## What it does now
 
-```
-moonwalker-trading-bot/
-├── backend/                    # Node.js + Express + TypeScript
-│   ├── src/
-│   │   ├── index.ts            # App entry, HTTP + WebSocket server
-│   │   ├── config.ts           # Config loader (.env + config.json)
-│   │   ├── logger.ts           # Winston logger
-│   │   ├── api/
-│   │   │   ├── routes.ts       # REST API routes
-│   │   │   └── middleware.ts
-│   │   ├── bybit/
-│   │   │   ├── client.ts       # Bybit REST v5 client
-│   │   │   └── websocket.ts    # Real-time 5m/15m kline subscriptions
-│   │   ├── strategy/
-│   │   │   ├── breakBounce.ts  # Core strategy engine
-│   │   │   ├── candlePatterns.ts  # Pattern detectors
-│   │   │   └── riskManager.ts  # SL/TP/position sizing
-│   │   ├── backtest/
-│   │   │   └── engine.ts       # Historical backtest engine
-│   │   ├── scheduler/
-│   │   │   └── cron.ts         # UTC midnight daily range refresh
-│   │   └── storage/
-│   │       ├── jsonStore.ts    # JSON file persistence (default)
-│   │       └── store.ts        # Unified store interface
-│   ├── data/                   # Runtime JSON data (gitignored)
-│   ├── logs/                   # Log files (gitignored)
-│   ├── migrations/             # PostgreSQL migrations
-│   └── .env.example
-│
-├── frontend/                   # Vite + Vue 3 + Tailwind/DaisyUI
-│   └── src/
-│       ├── api/client.ts       # Axios + all API types
-│       ├── composables/        # useWebSocket (auto-reconnect)
-│       ├── stores/             # Pinia: config, market, trades, backtest
-│       ├── components/         # StatCard, TradeRow, EquityCurve, etc.
-│       └── views/              # Dashboard, LiveTrading, Backtest, etc.
-│
-├── docker-compose.yml
-├── Dockerfile.backend
-└── README.md
-```
+- **Paper broker** (default) — fills at last close plus fee/slippage; SL/TP close on later candles. Never calls Bybit order APIs.
+- **Live mode** — same signals, real market orders. Requires locally stored API keys.
+- **Several strategies at once** — each with its own Auto toggle and coin list.
+- **Top 50 Bybit USDT perps** in Coin Scanner (up to 50 active).
+- **Trade history** kept in `backend/data/trades.json` (paper reset does not wipe it).
+- **Keys stay on this machine** — encrypted `backend/data/secrets.json`, gitignored.
+
+Frontend: **http://localhost:5180**  
+Backend: **http://localhost:3001**
 
 ---
 
-## 🚀 Quick Start (No Docker Required)
+## Strategies
 
-### Prerequisites
-- Node.js 20+
-- npm 10+
-- A Bybit account with API keys (use **testnet** to start — [create testnet keys here](https://testnet.bybit.com))
+Crypto-perp starting defaults (not claimed optimal). Factory “Default …” instances use these.
 
-### 1. Navigate to the project
+| Type | Idea | Starting defaults |
+|------|------|-------------------|
+| `break_bounce` | Prev-day range break → retest → reversal candle | D / 15m / 5m, 0.08% buffer, UTC 00:00–04:00, 2.5R |
+| `ema_pullback` | 9/21 trend, enter on a tap of the fast EMA | 15m, 2% SL / 4% TP |
+| `supertrend` | ATR trailing band; trade flips | ATR 10 × 2 on 15m |
+| `donchian` | 20-bar channel breakout, ATR stops | 4h, SL 2.5 ATR, TP 4 ATR |
+| `vwap` | Fade extensions from UTC-session VWAP | 5m, 0.6% band |
+| `orb` | First N minutes of UTC day set the range | 30m range, 2R, 1 trade/day |
+| `rsi` | Extreme mean-reversion | 14 / 20 / 80, 2 confirm candles, 1h |
+| `ma_crossover` | Fast/slow MA cross | 20/50 on 4h |
+| `bollinger` | Band breakout + volume | 20 / 2σ, 4h, breakout mode |
+| `dca` | Timed buys with TP / trail | $50 / 24h, $500 cap, 15% TP |
+| `grid` | Geometric grid inside a range | 12 levels, set upper/lower per coin |
+
+Break & Bounce still uses the dedicated engine (blueprint → breakout close → retest → hammer / engulfing / shooting star). Other types go through the strategy registry.
+
+---
+
+## Quick start
+
+**Prerequisites:** Node.js 20+, npm 10+. API keys are **not** required for paper trading (public klines).
+
 ```bash
-cd /home/ed/dev/moonwalker-trading-bot
-```
-
-### 2. Start the backend
-```bash
-cd backend
-cp .env.example .env
-# Edit .env — add your Bybit testnet API keys (BYBIT_API_KEY, BYBIT_API_SECRET)
-# Leave BYBIT_TESTNET=true
-npm install
-npm run dev
-# Backend running at http://localhost:3001
-```
-
-### 3. Start the frontend (new terminal)
-```bash
-cd frontend
-npm install
-npm run dev
-# App running at http://localhost:5173
-```
-
-Open **http://localhost:5173** — done. No Docker, no database setup needed (JSON file storage is the default).
-
-### Or — start both with one command
-```bash
-cd /home/ed/dev/moonwalker-trading-bot
+cd /home/edelarey/dev-personal/moonwalker-trading-bot
+cp backend/.env.example backend/.env
+# Set ENCRYPTION_KEY to a random 32+ character string (used to encrypt keys later)
+npm run install:all
 npm run dev
 ```
-This starts both backend (port 3001) and frontend (port 5173) in parallel.
+
+Open **http://localhost:5180**.
+
+1. Stay on **Paper** (default).
+2. **Coin Scanner** — enable coins from the top 50 (or add any USDT perp).
+3. **Trading** or **Strategy Manager** — turn **On** + **Auto** on one or more strategies and pick coins.
+4. For Break & Bounce, also enable **AUTO** on the Trading page (it only fires inside the UTC liquidity window).
+5. Watch **Positions** for paper fills and SL/TP closes.
+
+### One terminal vs two processes
+
+`npm run dev` is **one terminal**, not one process. A parent (`concurrently`) starts two children:
+
+1. **Backend** on port 3001.
+2. **Frontend** (Vite on 5180), but only after `wait-on` sees `127.0.0.1:3001`. That avoids the Vite `ws proxy error: ECONNREFUSED 127.0.0.1:3001` you get if the UI boots first.
+
+**Ctrl+C** sends SIGTERM to both. The backend shuts down gracefully (cron, Bybit socket, HTTP, logs), then Vite exits. You should not need a second terminal for day-to-day work.
+
+| | Combined `npm run dev` | Split terminals |
+|--|------------------------|-----------------|
+| Logs | One window, prefixed `backend` / `frontend` | Separate |
+| Stop | Ctrl+C stops both | You must stop each yourself |
+| Crash | If one child dies, the other is stopped (`-k`) | The other keeps running |
+| Restart one side | Stop the whole command, or use the split scripts | Restart only that terminal |
+| Debugger | Slightly clumsier | Attach to one process easily |
+
+This is **dev only**. Production still runs the compiled backend by itself; Vite is not the production server.
+
+To run them apart (debugging, keep the UI up while the API restarts):
+
+```bash
+npm run dev:backend    # http://localhost:3001
+npm run dev:frontend    # http://localhost:5180  (start after the API is up)
+```
 
 ---
 
-## ⚙️ Configuration
+## Paper vs live
 
-Edit `backend/.env`:
+| Mode | Data | Orders | Keys |
+|------|------|--------|------|
+| **Paper** (default) | Live Bybit klines | Local simulation | Not needed |
+| **Live** | Same klines | `placeMarketOrder` on Bybit | Required |
+
+On **Trading** or **Settings**: click Paper, or type `LIVE` and confirm. Live is rejected until keys are saved. Sidebar badge is a shortcut to Settings.
+
+Paper fill model: last close ± slippage (default **3 bps**), taker fee (default **6 bps**). If a candle tags both SL and TP, the **stop** is filled.
+
+---
+
+## Bybit sub-account keys
+
+Save them in **Settings → Bybit sub-account** (label, key, secret, testnet toggle).
+
+- Encrypted with `ENCRYPTION_KEY` into `backend/data/secrets.json` (file mode `0600`).
+- `backend/data/*.json` and `backend/.env` are gitignored. Keys are never committed and never sent back to the UI (only a hint like `••••Ab12`).
+- Use a **sub-account** with Contract Trade and **no withdrawal**.
+- Optional fallback: `BYBIT_API_KEY` / `BYBIT_API_SECRET` in `backend/.env`.
+
+Removing keys in Settings deletes the local file and forces Paper mode.
+
+---
+
+## Configuration
+
+### `backend/.env`
 
 ```env
-# Bybit API — testnet recommended to start
-BYBIT_API_KEY=your_api_key_here
-BYBIT_API_SECRET=your_api_secret_here
+# Optional fallback — prefer Settings UI for keys
+BYBIT_API_KEY=
+BYBIT_API_SECRET=
 BYBIT_TESTNET=true
 
-# Server
 PORT=3001
 NODE_ENV=development
-
-# Storage: 'json' (default) or 'postgres'
 STORAGE_MODE=json
-
-# PostgreSQL (only if STORAGE_MODE=postgres)
-DATABASE_URL=postgresql://user:password@localhost:5432/moonwalker
-
-# 32-char encryption key for stored API keys
 ENCRYPTION_KEY=change_this_to_a_random_32_char_string
 ```
 
-### Strategy parameters (editable in the GUI under Settings / Live Trading)
+### `frontend/.env` (optional)
+
+```env
+VITE_API_URL=http://localhost:3001
+```
+
+The Vite dev server proxies `/api` and `/ws` to the backend, so this is only needed if the UI talks to the API on another host.
+
+### Global params (Settings / Trading)
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `riskPercent` | `1` | % of equity risked per trade |
-| `tpMultiplier` | `2.5` | Take-profit = risk × multiplier |
-| `liquidityWindowStart` | `00:00` | UTC time to start trading |
-| `liquidityWindowEnd` | `02:30` | UTC time to stop trading |
-| `maxDailyTradesPerCoin` | `1` | Max entries per coin per day |
-| `breakoutBufferPercent` | `0.05` | Extra buffer for breakout confirmation |
+| `tradingMode` | `paper` | `paper` or `live` |
+| `riskPercent` | `1` | % of equity risked per sized trade |
+| `tpMultiplier` | `2.5` | Break & Bounce take-profit = risk × this |
+| `liquidityWindowStart` / `End` | `00:00` / `04:00` UTC | Break & Bounce entry window |
+| `maxDailyTradesPerCoin` | `1` | Break & Bounce cap |
+| `breakoutBufferPercent` | `0.08` | Close must clear the level by this % |
+| `paperStartingEquity` | `10000` | Virtual USDT |
+| `paperFeeBps` | `6` | ~0.06% taker |
+| `paperSlippageBps` | `3` | Applied on paper entry/exit |
+
+Strategy-specific params are edited per instance in Strategy Manager.
 
 ---
 
-## 🖥️ GUI Features
+## GUI
 
 | Page | Description |
 |------|-------------|
-| **Dashboard** | Live status all coins, daily ranges, equity curve, recent breakouts & trades |
-| **Coin Scanner** | Add/remove/toggle up to 20 USDT perpetual symbols |
-| **Live Trading** | Toggle AUTO mode, adjust risk parameters, live reversal signal feed |
-| **Positions** | Live Bybit positions with one-click manual close + full trade history |
-| **Backtest** | Date range picker, multi-coin select, run historical backtest |
-| **BT Results** | Win rate, profit factor, max drawdown, equity curve, trade list, CSV export |
-| **Settings** | API keys note, testnet toggle, storage mode selector |
+| **Dashboard** | Paper/live badge, equity, PnL, breakouts, recent trades |
+| **Coin Scanner** | Top 50 Bybit USDT perps by 24h turnover; enable up to 50; add others manually |
+| **Trading** | Paper/Live switch, Break & Bounce AUTO + risk, **all strategies** with On / Auto / coin chips |
+| **Positions** | Open book + full history (filter paper/live, coin, strategy); CSV export |
+| **Backtest** | Historical run for Break & Bounce or a strategy instance |
+| **BT Results** | Summary metrics, equity curve, trade list |
+| **Strategy Manager** | Create/edit/delete instances, deploy paper, run backtests |
+| **Results** | Last per-strategy backtest snapshot |
+| **Settings** | Mode switch, paper account reset, **sub-account keys**, storage |
+| **Help** | Strategy notes, paper workflow, extra strategy descriptions |
 
 ---
 
-## 🧪 Running a Backtest
+## Testing a strategy
 
-1. Go to **Backtest** in the sidebar
-2. Select date range (e.g. 2024-01-01 → 2024-12-31)
-3. Select symbols (e.g. BTCUSDT, ETHUSDT, SOLUSDT)
-4. Adjust parameters if needed
-5. Click **▶ Run Backtest**
-6. Results appear automatically in **BT Results**
-7. Export to CSV with one click
-
-The backtest engine fetches real Bybit historical klines and runs the identical Break & Bounce logic — same code as live trading.
+1. Leave mode on **Paper**.
+2. Enable **BTCUSDT** (or ETH) only at first.
+3. Deploy **one** strategy (e.g. EMA pullback on 15m — more signals).
+4. Confirm: signal → paper fill on Positions → SL or TP close → equity moves.
+5. Run a historical backtest with the same params.
+6. Paper for several sessions. Break & Bounce and ORB are session-bound (UTC).
+7. Only then consider live with tiny size.
 
 ---
 
-## 🐳 Docker (Optional — Production)
+## Architecture
 
-### Start with Docker Compose (includes PostgreSQL)
-```bash
-# Create backend .env first
-cp backend/.env.example backend/.env
-# Edit backend/.env
-
-docker-compose up -d
+```
+moonwalker-trading-bot/
+├── backend/src/
+│   ├── index.ts                 # HTTP + frontend WebSocket, boot
+│   ├── config.ts                # .env + data/config.json
+│   ├── execution/
+│   │   ├── paperBroker.ts       # Virtual account, fills, SL/TP
+│   │   └── executionService.ts  # Routes paper vs live
+│   ├── security/secrets.ts      # Encrypted local API keys
+│   ├── bybit/                   # REST v5 + kline WebSocket
+│   ├── strategy/
+│   │   ├── breakBounce.ts       # Dedicated B&B engine
+│   │   ├── registry.ts          # All other strategy types
+│   │   ├── runtime.ts           # Enable/warmup/subscribe
+│   │   └── strategies/          # RSI, EMA, Supertrend, ORB, …
+│   ├── backtest/engine.ts       # Historical B&B
+│   ├── storage/                 # JSON trades, ranges, instances
+│   └── api/routes.ts
+├── frontend/                    # Vite + Vue 3, port 5180
+└── README.md
 ```
 
-- Backend: http://localhost:3001
-- PostgreSQL: localhost:5432
-
-### Build frontend for production
-```bash
-cd frontend
-npm run build
-# Serve dist/ with nginx or any static host
-```
-
-### Full docker-compose with frontend nginx (optional)
-Add a frontend service to `docker-compose.yml`:
-```yaml
-  frontend:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-    volumes:
-      - ./frontend/dist:/usr/share/nginx/html
-    depends_on:
-      - backend
-```
+Signals (Break & Bounce reversals and registry `entry`/`exit`) go through `executionService`. If `tradingMode === 'paper'`, `placeMarketOrder` is never called.
 
 ---
 
-## 📊 REST API Reference
+## REST API
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/config` | Get app config |
-| PUT | `/api/config` | Update config |
-| GET | `/api/symbols` | List tracked symbols |
-| POST | `/api/symbols` | Add symbol |
-| DELETE | `/api/symbols/:symbol` | Remove symbol |
-| GET | `/api/daily-ranges` | Get stored daily ranges |
-| POST | `/api/daily-ranges/refresh` | Force refresh daily ranges |
-| GET | `/api/trades` | Get all trades |
-| GET | `/api/trades/export-csv` | Export trades as CSV |
-| GET | `/api/positions` | Get live Bybit positions |
-| POST | `/api/positions/:symbol/close` | Close a position |
-| GET | `/api/account/equity` | Get USDT equity |
-| POST | `/api/backtest/run` | Run backtest |
-| GET | `/api/backtest/results` | List backtest results |
-| GET | `/api/backtest/results/:id/export-csv` | Export backtest as CSV |
+| GET/PUT | `/api/config` | App config (live mode rejected without keys) |
+| GET/POST/DELETE | `/api/symbols` | Tracked symbols |
+| POST | `/api/symbols/bulk` | Enable a list (e.g. from top 50) |
+| GET | `/api/markets/top` | Top USDT linear perps by turnover |
+| GET/PUT/DELETE | `/api/keys` | Key **status** / save / clear (secret never returned) |
+| GET | `/api/trades` | All trades |
+| GET | `/api/trades/export-csv` | CSV export |
+| GET | `/api/positions` | Paper book or Bybit positions |
+| POST | `/api/positions/:symbol/close` | Close paper or live |
+| GET | `/api/account/equity` | Paper snapshot or Bybit equity |
+| GET/POST | `/api/paper/account`, `/api/paper/reset` | Paper account |
+| POST/GET | `/api/backtest/run`, `/api/backtest/results` | B&B backtest |
+| GET/POST/PUT/DELETE | `/api/strategies` | Strategy instances |
+| GET | `/api/strategies/defaults/:type` | Starting params for a type |
+| POST | `/api/strategies/:id/backtest` | Instance backtest |
 
-### WebSocket (`ws://localhost:3001/ws`)
-Push events from backend to frontend:
+### WebSocket (`ws://localhost:3001/ws`, proxied as `/ws` on 5180)
+
 ```json
-{ "type": "breakout", "signal": { "symbol": "BTCUSDT", "direction": "bullish", ... } }
-{ "type": "retest",   "signal": { ... } }
-{ "type": "reversal", "signal": { "symbol": "BTCUSDT", "patternType": "hammer", "entryPrice": 65000, ... } }
-{ "type": "trade_opened", "trade": { ... } }
-{ "type": "candle",   "symbol": "BTCUSDT", "interval": "5", "candle": { ... }, "confirmed": true }
+{ "type": "candle", "symbol": "BTCUSDT", "interval": "15", "candle": { }, "confirmed": true }
+{ "type": "breakout", "signal": { } }
+{ "type": "retest", "signal": { } }
+{ "type": "reversal", "signal": { } }
+{ "type": "strategy_signal", "strategyId": "…", "strategyName": "…", "signal": { } }
+{ "type": "trade_opened", "trade": { } }
+{ "type": "trade_closed", "trade": { } }
+{ "type": "paper_account", "account": { } }
 ```
 
 ---
 
-## 🔒 Security Notes
+## Data files (gitignored)
 
-- **API keys** are stored in `backend/.env` and never sent to the frontend
-- Always start on **testnet** (`BYBIT_TESTNET=true`) — switch to mainnet only after thorough testing
-- Set `ENCRYPTION_KEY` to a strong random 32-character string
-- The GUI has a prominent **TESTNET / MAINNET** indicator in the Dashboard header
-- AUTO mode requires explicit toggle — manual override always available
-
----
-
-## 🛠️ Development Scripts
-
-### Backend
-```bash
-cd backend
-npm run dev       # Start dev server (ts-node-dev, hot reload)
-npm run build     # Compile TypeScript → dist/
-npm start         # Run compiled production build
-```
-
-### Frontend
-```bash
-cd frontend
-npm run dev       # Vite dev server (http://localhost:5173)
-npm run build     # Production build → dist/
-npm run preview   # Preview production build
-```
-
----
-
-## 📦 Tech Stack
-
-### Backend
-- **Node.js 20** + **TypeScript 5** (strict)
-- **Express 4** — REST API
-- **bybit-api** — Official Bybit v5 REST + WebSocket
-- **node-cron** — Daily range refresh scheduler
-- **Winston** — Structured logging (console + file)
-- **Drizzle ORM** + **pg** — PostgreSQL support
-- **ws** — Internal WebSocket server (frontend push)
-
-### Frontend
-- **Vue 3** + **TypeScript** (Composition API + `<script setup>` only)
-- **Vite 5** — Build tool
-- **Pinia** — State management
-- **Vue Router 4** — Routing
-- **Tailwind CSS 3** + **DaisyUI 4** — UI (dark mode default)
-- **lightweight-charts** (TradingView) — Equity curve & price charts
-- **Axios** — HTTP client
-
----
-
-## 📁 Data Files (JSON mode)
-
-Stored in `backend/data/` (auto-created, gitignored):
+`backend/data/` is created at runtime:
 
 | File | Contents |
 |------|----------|
-| `config.json` | App config (symbols, risk params) |
-| `trades.json` | All trades (live + paper) |
-| `daily-ranges.json` | Previous day highs & lows |
-| `backtest-results.json` | Backtest result history (last 50) |
+| `config.json` | Symbols, risk, `tradingMode`, strategy default templates |
+| `trades.json` | All paper + live trades (history is kept) |
+| `paper-account.json` | Virtual equity / realized PnL |
+| `strategy-instances.json` | Your strategy configs |
+| `secrets.json` | Encrypted API key + secret |
+| `daily-ranges.json` | Prev-day highs/lows |
+| `backtest-results.json` | Last 50 B&B backtests |
 
 ---
 
-## 🗃️ PostgreSQL (Optional)
+## Security
 
-Set `STORAGE_MODE=postgres` and `DATABASE_URL` in `.env`, then run migrations:
+- Default mode is **paper**. Live needs keys **and** typing `LIVE`.
+- Secrets live only under `backend/data/` and `backend/.env` (both gitignored).
+- Set a real `ENCRYPTION_KEY` before saving keys.
+- Header / sidebar show **PAPER** or **LIVE**.
+- AUTO / per-strategy Auto are off until you turn them on.
+
+---
+
+## Scripts
+
 ```bash
-cd backend
-psql $DATABASE_URL -f migrations/0001_init.sql
+# root
+npm run install:all
+npm run dev                 # one terminal, two processes: API then Vite. Ctrl+C stops both
+npm run dev:backend         # API only (3001)
+npm run dev:frontend        # Vite only (5180) — wait until the API is listening
+npm run build:frontend
+
+# backend/
+npm run dev | build | start
+
+# frontend/
+npm run dev                 # http://localhost:5180 (strictPort)
+npm run build | preview
 ```
 
-Or use Docker Compose which starts a pre-configured PostgreSQL instance.
+---
+
+## Tech stack
+
+**Backend:** Node 20, TypeScript, Express, `bybit-api`, node-cron, Winston, optional Drizzle/pg.  
+**Frontend:** Vue 3, Vite 5 (port 5180), Pinia, Vue Router, Tailwind + DaisyUI, lightweight-charts, Axios.
 
 ---
 
-## ⚡ Candle Patterns Implemented
+## Break & Bounce candle patterns
 
-| Pattern | Direction | Description |
-|---------|-----------|-------------|
-| **Hammer** | Bullish | Small body at top, lower wick ≥ 2× body |
-| **Inverted Hammer** | Bullish | Small body at bottom, upper wick ≥ 2× body |
-| **Bullish Engulfing** | Bullish | Bullish candle body fully engulfs prior bearish body |
-| **Shooting Star** | Bearish | Small bearish body at bottom, upper wick ≥ 2× body |
-| **Bearish Engulfing** | Bearish | Bearish candle body fully engulfs prior bullish body |
+| Pattern | Direction |
+|---------|-----------|
+| Hammer / inverted hammer | Bullish |
+| Bullish engulfing | Bullish |
+| Shooting star | Bearish |
+| Bearish engulfing | Bearish |
 
 ---
 
-## 📄 License
+## License
 
 MIT — use at your own risk. Not financial advice.

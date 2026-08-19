@@ -6,16 +6,21 @@ import { env, loadConfig } from './config';
 import { logger } from './logger';
 import { wsManager, CandleUpdate } from './bybit/websocket';
 import { BreakBounceEngine } from './strategy/breakBounce';
-import { initScheduler, refreshDailyRanges } from './scheduler/cron';
-import { store } from './storage/store';
-import { placeMarketOrder, getAccountEquity } from './bybit/client';
-import { calcPositionSize } from './strategy/riskManager';
+import { initScheduler, refreshDailyRanges, stopScheduler } from './scheduler/cron';
 import { ReversalSignal } from './types';
 import apiRouter from './api/routes';
 import { errorHandler, requestLogger } from './api/middleware';
-import { v4 as uuidv4 } from 'uuid';
 import { strategyRegistry } from './strategy/registry';
 import { getStrategyInstances, seedDefaultStrategies } from './storage/strategyStore';
+import { activateStrategy, collectRequiredIntervals, enabledSymbols, setBreakBounceEngine, syncSubscriptions } from './strategy/runtime';
+import { resolveApiCredentials } from './security/secrets';
+import {
+  handleStrategySignal,
+  openFromReversal,
+  processPaperCandle,
+  setExecutionBroadcast,
+} from './execution/executionService';
+import { paperBroker } from './execution/paperBroker';
 
 const app = express();
 app.use(cors({ origin: '*' }));
@@ -26,7 +31,6 @@ app.use(errorHandler);
 
 const httpServer = createServer(app);
 
-// --- Internal WebSocket (push updates to frontend) ---
 const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
 function broadcast(data: unknown): void {
@@ -36,39 +40,37 @@ function broadcast(data: unknown): void {
   });
 }
 
+setExecutionBroadcast(broadcast);
+
 wss.on('connection', (ws) => {
   logger.info('Frontend WebSocket client connected');
+  ws.send(JSON.stringify({ type: 'paper_account', account: paperBroker.getSnapshot() }));
   ws.on('close', () => logger.info('Frontend WebSocket client disconnected'));
 });
 
-// --- Boot sequence ---
 async function boot(): Promise<void> {
   const config = loadConfig();
-  // Only subscribe to WebSocket feeds for enabled symbols (max 20)
-  const enabledSymbols = config.symbols.filter(s => s.enabled).map(s => s.symbol);
-
-  // Only enabled symbols are passed to the engine — disabled symbols are not tracked
+  const symbols = enabledSymbols();
   const engine = new BreakBounceEngine(config);
+  setBreakBounceEngine(engine);
 
-  // Seed default strategy instances if none exist
   await seedDefaultStrategies();
-
-  // Initialize scheduler
-  initScheduler(engine, enabledSymbols);
-
-  // Fetch daily ranges on startup
+  initScheduler(engine, symbols);
   await refreshDailyRanges();
 
-  // Connect WebSocket to Bybit
-  wsManager.connect(config.testnet);
-  wsManager.subscribeSymbols(enabledSymbols, [config.breakoutTimeframe, config.entryTimeframe]);
+  const creds = resolveApiCredentials();
+  wsManager.connect(creds.testnet);
+  wsManager.subscribeSymbols(symbols, collectRequiredIntervals());
 
-  // Wire up Bybit WS candle events → strategy engine
+  let ready = false;
+
   wsManager.on('candle', async (update: CandleUpdate) => {
-    // Only process confirmed (closed) candles
     if (!update.confirmed) return;
-
     broadcast({ type: 'candle', ...update });
+    paperBroker.mark(update.symbol, update.candle.close);
+    if (!ready) return;
+
+    processPaperCandle(update.symbol, update.candle);
 
     const currentConfig = loadConfig();
     if (update.interval === currentConfig.breakoutTimeframe) {
@@ -77,11 +79,9 @@ async function boot(): Promise<void> {
       engine.process5mCandle(update.symbol, update.candle);
     }
 
-    // Route candle to all registered strategy instances
     strategyRegistry.routeCandle(update.symbol, update.candle, update.interval);
   });
 
-  // Wire up strategy engine events → trade execution (AUTO mode)
   engine.on('breakout', (signal) => {
     broadcast({ type: 'breakout', signal });
     logger.info('Broadcast breakout', { symbol: signal.symbol, direction: signal.direction });
@@ -95,84 +95,108 @@ async function boot(): Promise<void> {
     broadcast({ type: 'reversal', signal });
     logger.info('Reversal signal, checking AUTO mode', { symbol: signal.symbol });
 
-    // Check if AUTO mode is enabled (stored in config)
     const currentConfig = loadConfig();
-    if (!(currentConfig as any).autoMode) {
+    if (!currentConfig.autoMode) {
       logger.info('AUTO mode OFF — skipping auto trade', { symbol: signal.symbol });
       return;
     }
 
-    // AUTO mode: execute the trade
     try {
-      const equity = await getAccountEquity();
-      const { positionSize, qty } = calcPositionSize(
-        equity,
-        currentConfig.riskPercent,
-        signal.entryPrice,
-        signal.stopLoss
-      );
-      const side = signal.direction === 'bullish' ? 'Buy' : 'Sell';
-      const orderId = await placeMarketOrder({
-        symbol: signal.symbol,
-        side,
-        qty: qty.toFixed(3),
-        stopLoss: signal.stopLoss.toFixed(4),
-        takeProfit: signal.takeProfit.toFixed(4),
-      });
-
-      const trade = {
-        id: uuidv4(),
-        symbol: signal.symbol,
-        direction: signal.direction,
-        entryPrice: signal.entryPrice,
-        stopLoss: signal.stopLoss,
-        takeProfit: signal.takeProfit,
-        riskDistance: signal.riskDistance,
-        riskPercent: currentConfig.riskPercent,
-        positionSize,
-        qty,
-        openedAt: Date.now(),
-        status: 'open' as const,
-        bybitOrderId: orderId,
-        isBacktest: false,
-        patternType: signal.patternType,
-        dailyHigh: signal.retest.breakout.brokenLevel,
-        dailyLow: signal.retest.breakout.brokenLevel,
-      };
-      store.saveTrade(trade);
-      engine.recordTrade(signal.symbol);
-      broadcast({ type: 'trade_opened', trade });
-      logger.info('AUTO trade opened', { symbol: signal.symbol, orderId });
+      const trade = await openFromReversal(signal);
+      if (trade) engine.recordTrade(signal.symbol);
     } catch (err) {
       logger.error('AUTO trade failed', { symbol: signal.symbol, err });
     }
   });
 
-  // Load and register saved strategy instances
   const savedInstances = getStrategyInstances();
   for (const inst of savedInstances.filter(s => s.enabled)) {
-    try {
-      const strategy = strategyRegistry.createStrategy(inst);
-      strategyRegistry.register(strategy);
-    } catch (err) {
-      logger.warn('Failed to load strategy instance', { id: inst.id, err });
-    }
+    await activateStrategy(inst);
   }
 
-  // Emit signals to frontend
-  strategyRegistry.on('signal', (data) => {
-    broadcast({ type: 'strategy_signal', ...data });
+  strategyRegistry.on('signal', (data: { strategyId: string; signal: any }) => {
+    const inst = getStrategyInstances().find(s => s.id === data.strategyId);
+    broadcast({
+      type: 'strategy_signal',
+      strategyId: data.strategyId,
+      strategyName: inst?.name ?? data.strategyId,
+      signal: data.signal,
+    });
+    if (inst) {
+      void handleStrategySignal(data.strategyId, data.signal, inst);
+    }
   });
 
-  httpServer.listen(env.PORT, () => {
-    logger.info(`BreakBounce backend running on port ${env.PORT}`);
+  syncSubscriptions();
+  ready = true;
+
+  const mode = config.tradingMode ?? 'paper';
+  httpServer.listen(env.PORT, '0.0.0.0', () => {
+    logger.info(`Moonwalker backend running on port ${env.PORT}`);
     logger.info(`Storage mode: ${config.storageMode}`);
+    logger.info(`Trading mode: ${mode}`);
     logger.info(`Bybit testnet: ${config.testnet}`);
-    logger.info(`Tracking ${enabledSymbols.length} symbols`);
+    logger.info(`Tracking ${symbols.length} symbols`);
+    if (mode === 'paper') {
+      const snap = paperBroker.getSnapshot();
+      logger.info('Paper account', { equity: snap.equity, starting: snap.startingEquity });
+    }
   });
 }
 
 boot().catch(err => {
   logger.error('Boot failed', { err });
   process.exit(1);
+});
+
+let shuttingDown = false;
+
+function closeFrontendSockets(): void {
+  wss.clients.forEach(client => {
+    try { client.close(1001, 'server shutting down'); } catch { /* ignore */ }
+  });
+}
+
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info('Graceful shutdown started', { signal });
+
+  const force = setTimeout(() => {
+    logger.error('Graceful shutdown timed out — forcing exit');
+    process.exit(1);
+  }, 8_000);
+  force.unref();
+
+  try {
+    stopScheduler();
+    wsManager.disconnect();
+    closeFrontendSockets();
+
+    await new Promise<void>((resolve, reject) => {
+      wss.close(err => (err ? reject(err) : resolve()));
+    }).catch(err => logger.warn('WebSocket server close error', { err }));
+
+    await new Promise<void>((resolve, reject) => {
+      httpServer.close(err => (err ? reject(err) : resolve()));
+    });
+
+    await new Promise<void>(resolve => logger.end(() => resolve()));
+  } catch (err) {
+    logger.error('Error during shutdown', { err });
+    process.exit(1);
+    return;
+  }
+
+  process.exit(0);
+}
+
+process.on('SIGINT', () => { void shutdown('SIGINT'); });
+process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception', { err });
+  void shutdown('uncaughtException');
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled rejection', { reason });
 });

@@ -46,7 +46,7 @@ export class MACrossoverStrategy implements IStrategy {
 
   describe(): string { return `MA Crossover: Golden cross (${this.params.shortPeriod}/${this.params.longPeriod}) entry, death cross exit.`; }
   defaultParams(): MACrossoverParams {
-    return { shortPeriod: 50, longPeriod: 200, timeframe: '60', stopLossPercent: 3, takeProfitPercent: 9, trailingStopPercent: 4 };
+    return { shortPeriod: 20, longPeriod: 50, timeframe: '240', stopLossPercent: 3, takeProfitPercent: 8, trailingStopPercent: 4 };
   }
 
   onCandle(symbol: string, candle: Candle, interval: string): StrategySignal | null {

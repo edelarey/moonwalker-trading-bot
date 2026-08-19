@@ -55,6 +55,8 @@ export interface ReversalSignal {
 }
 
 export type TradeStatus = 'open' | 'closed_tp' | 'closed_sl' | 'closed_manual';
+export type TradingMode = 'paper' | 'live';
+export type TradeMode = 'paper' | 'live' | 'backtest';
 
 export interface Trade {
   id: string;
@@ -72,10 +74,15 @@ export interface Trade {
   closePrice?: number;
   pnl?: number;           // USDT
   pnlPercent?: number;
+  fees?: number;
   status: TradeStatus;
   bybitOrderId?: string;
   isBacktest: boolean;
-  patternType: CandlePatternType;
+  mode?: TradeMode;
+  strategyInstanceId?: string;
+  strategyType?: string;
+  tag?: string;
+  patternType: CandlePatternType | string;
   dailyHigh: number;
   dailyLow: number;
 }
@@ -87,12 +94,7 @@ export interface SymbolConfig {
 }
 
 export interface StrategyDefaults {
-  break_bounce: Record<string, any>;
-  dca: DCAParams;
-  grid: GridParams;
-  ma_crossover: MACrossoverParams;
-  rsi: RSIParams;
-  bollinger: BollingerParams;
+  [key: string]: Record<string, unknown>;
 }
 
 export interface AppConfig {
@@ -109,7 +111,41 @@ export interface AppConfig {
   breakoutTimeframe: '1' | '3' | '5' | '15' | '30' | '60' | '120' | '240';  // Breakout confirmation candle (default '15')
   entryTimeframe: '1' | '3' | '5' | '15' | '30';  // Entry/reversal candle (default '5')
   autoMode?: boolean;
+  tradingMode?: TradingMode;
+  paperStartingEquity?: number;
+  paperFeeBps?: number;
+  paperSlippageBps?: number;
   strategyDefaults?: StrategyDefaults;
+}
+
+export interface PaperAccountSnapshot {
+  mode: TradingMode;
+  startingEquity: number;
+  equity: number;
+  cashEquity: number;
+  realizedPnl: number;
+  unrealizedPnl: number;
+  totalFees: number;
+  openCount: number;
+  updatedAt: number;
+}
+
+export interface PaperPositionView {
+  tradeId: string;
+  symbol: string;
+  side: 'Buy' | 'Sell';
+  direction: BreakoutDirection;
+  size: string;
+  qty: number;
+  avgPrice: string;
+  markPrice: string;
+  unrealisedPnl: string;
+  stopLoss: string;
+  takeProfit: string;
+  strategyType?: string;
+  strategyInstanceId?: string;
+  mode: TradeMode;
+  openedAt: number;
 }
 
 export interface BacktestParams {
@@ -152,7 +188,34 @@ export interface BacktestSummary {
 // MULTI-STRATEGY TYPES
 // ============================================================
 
-export type StrategyType = 'break_bounce' | 'dca' | 'grid' | 'ma_crossover' | 'rsi' | 'bollinger';
+export type StrategyType =
+  | 'break_bounce'
+  | 'dca'
+  | 'grid'
+  | 'ma_crossover'
+  | 'rsi'
+  | 'bollinger'
+  | 'donchian'
+  | 'ema_pullback'
+  | 'supertrend'
+  | 'vwap'
+  | 'orb';
+
+export const MAX_ENABLED_SYMBOLS = 50;
+
+export const ALL_STRATEGY_TYPES: StrategyType[] = [
+  'break_bounce',
+  'dca',
+  'grid',
+  'ma_crossover',
+  'rsi',
+  'bollinger',
+  'donchian',
+  'ema_pullback',
+  'supertrend',
+  'vwap',
+  'orb',
+];
 
 export interface StrategySignal {
   type: 'entry' | 'exit' | 'hold';
@@ -240,6 +303,55 @@ export interface BollingerParams {
   stopLossPercent: number;
   takeProfitPercent: number;
   trailingStopPercent: number;
+}
+
+// Donchian / Turtle breakout
+export interface DonchianParams {
+  [key: string]: unknown;
+  period: number;
+  timeframe: string;
+  atrPeriod: number;
+  atrMultiplier: number;
+  takeProfitAtrMultiplier: number;
+}
+
+// 9/21 EMA pullback in the direction of the trend
+export interface EmaPullbackParams {
+  [key: string]: unknown;
+  fastPeriod: number;
+  slowPeriod: number;
+  timeframe: string;
+  stopLossPercent: number;
+  takeProfitPercent: number;
+}
+
+// ATR Supertrend flip
+export interface SupertrendParams {
+  [key: string]: unknown;
+  atrPeriod: number;
+  multiplier: number;
+  timeframe: string;
+}
+
+// Session VWAP mean-reversion
+export interface VwapParams {
+  [key: string]: unknown;
+  timeframe: string;
+  deviationPercent: number;
+  stopLossPercent: number;
+  takeProfitPercent: number;
+  sessionResetHour: number;
+}
+
+// Opening Range Breakout
+export interface OrbParams {
+  [key: string]: unknown;
+  rangeMinutes: number;
+  timeframe: string;
+  breakoutBufferPercent: number;
+  takeProfitRr: number;
+  sessionStartHour: number;
+  maxTradesPerDay: number;
 }
 
 export interface Position {

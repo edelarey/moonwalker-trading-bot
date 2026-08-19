@@ -1,16 +1,17 @@
 import { RestClientV5 } from 'bybit-api';
-import { env } from '../config';
 import { logger } from '../logger';
 import { Candle, CandleInterval } from '../types';
+import { resolveApiCredentials } from '../security/secrets';
 
 let _client: RestClientV5 | null = null;
 
 export function getBybitClient(apiKey?: string, apiSecret?: string, testnet?: boolean): RestClientV5 {
   if (!_client) {
+    const stored = resolveApiCredentials();
     _client = new RestClientV5({
-      key: apiKey || env.BYBIT_API_KEY,
-      secret: apiSecret || env.BYBIT_API_SECRET,
-      testnet: testnet ?? env.BYBIT_TESTNET,
+      key: apiKey || stored.apiKey,
+      secret: apiSecret || stored.apiSecret,
+      testnet: testnet ?? stored.testnet,
     });
   }
   return _client;
@@ -157,4 +158,33 @@ export async function getOpenPositions(): Promise<any[]> {
   const response = await client.getPositionInfo({ category: 'linear', settleCoin: 'USDT' });
   if (response.retCode !== 0) throw new Error(response.retMsg);
   return (response.result.list as any[]).filter(p => parseFloat(p.size) > 0);
+}
+
+export interface MarketTicker {
+  symbol: string;
+  lastPrice: number;
+  turnover24h: number;
+  price24hPcnt: number;
+  volume24h: number;
+}
+
+/**
+ * Top USDT linear perps by 24h turnover. Public endpoint — no keys required.
+ */
+export async function fetchTopLinearMarkets(limit = 50): Promise<MarketTicker[]> {
+  const client = getBybitClient();
+  const response = await client.getTickers({ category: 'linear' });
+  if (response.retCode !== 0) throw new Error(response.retMsg);
+  const list = (response.result.list as any[])
+    .filter(t => typeof t.symbol === 'string' && t.symbol.endsWith('USDT'))
+    .map(t => ({
+      symbol: t.symbol as string,
+      lastPrice: parseFloat(t.lastPrice) || 0,
+      turnover24h: parseFloat(t.turnover24h) || 0,
+      price24hPcnt: parseFloat(t.price24hPcnt) || 0,
+      volume24h: parseFloat(t.volume24h) || 0,
+    }))
+    .sort((a, b) => b.turnover24h - a.turnover24h)
+    .slice(0, limit);
+  return list;
 }

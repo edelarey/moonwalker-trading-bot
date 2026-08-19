@@ -7,9 +7,19 @@ export type WsMessage =
   | { type: 'retest'; signal: any }
   | { type: 'reversal'; signal: any }
   | { type: 'trade_opened'; trade: any }
-  | { type: 'strategy_signal'; payload: any }
+  | { type: 'trade_closed'; trade: any }
+  | { type: 'paper_account'; account: any }
+  | { type: 'strategy_signal'; strategyId?: string; strategyName?: string; signal?: any; payload?: any }
 
 type MessageHandler = (msg: WsMessage) => void
+
+function mapSignalAction(sig: any): 'buy' | 'sell' | 'hold' {
+  if (!sig) return 'hold'
+  if (sig.type === 'entry') return sig.direction === 'bearish' ? 'sell' : 'buy'
+  if (sig.type === 'exit') return 'sell'
+  if (sig.signal === 'buy' || sig.signal === 'sell' || sig.signal === 'hold') return sig.signal
+  return 'hold'
+}
 
 export function useWebSocket(onMessage: MessageHandler) {
   const connected = ref(false)
@@ -32,7 +42,17 @@ export function useWebSocket(onMessage: MessageHandler) {
       try {
         const data = JSON.parse(ev.data) as WsMessage
         if (data.type === 'strategy_signal') {
-          useStrategiesStore().addSignal(data.payload)
+          const raw = data.signal ?? data.payload ?? {}
+          const inner = raw.signal ?? raw
+          useStrategiesStore().addSignal({
+            strategyId: data.strategyId ?? raw.strategyId ?? '',
+            strategyName: data.strategyName ?? raw.strategyName ?? data.strategyId ?? '',
+            symbol: inner.symbol ?? '',
+            signal: mapSignalAction(inner),
+            price: inner.price ?? 0,
+            timestamp: new Date(inner.generatedAt ?? Date.now()).toISOString(),
+            metadata: inner.metadata ?? {},
+          })
         }
         onMessage(data)
       } catch { /* ignore malformed */ }

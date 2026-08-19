@@ -21,10 +21,13 @@ export const useConfigStore = defineStore('config', () => {
 
   async function updateConfig(updates: Partial<AppConfig>) {
     loading.value = true
+    error.value = null
     try {
       config.value = await configApi.update(updates)
+      return true
     } catch (e: any) {
-      error.value = e.message
+      error.value = e.response?.data?.error ?? e.message
+      return false
     } finally {
       loading.value = false
     }

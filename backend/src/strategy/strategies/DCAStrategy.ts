@@ -35,12 +35,12 @@ export class DCAStrategy implements IStrategy {
   defaultParams(): DCAParams {
     return {
       investmentAmount: 50,
-      intervalMinutes: 1440,       // 24h
-      maxTotalInvestment: 1000,
-      takeProfitPercent: 20,
-      trailingStopPercent: 10,
+      intervalMinutes: 1440,
+      maxTotalInvestment: 500,
+      takeProfitPercent: 15,
+      trailingStopPercent: 8,
       maFilterPeriod: 50,
-      rsiFilterMax: 50,
+      rsiFilterMax: 45,
     };
   }
 

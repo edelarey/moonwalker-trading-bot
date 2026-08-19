@@ -1,8 +1,8 @@
 import { WebsocketClient } from 'bybit-api';
 import { EventEmitter } from 'events';
-import { env } from '../config';
 import { logger } from '../logger';
 import { Candle } from '../types';
+import { resolveApiCredentials } from '../security/secrets';
 
 export interface CandleUpdate {
   symbol: string;
@@ -15,16 +15,18 @@ class BybitWebSocketManager extends EventEmitter {
   private ws: WebsocketClient | null = null;
   private subscribedSymbols: Set<string> = new Set();
   private subscribedIntervals: string[] = ['5', '15'];
+  private symbolIntervals: Map<string, Set<string>> = new Map();
   private reconnectTimer: NodeJS.Timeout | null = null;
 
-  connect(testnet: boolean = env.BYBIT_TESTNET): void {
+  connect(testnet?: boolean): void {
     if (this.ws) return;
+    const creds = resolveApiCredentials();
 
     this.ws = new WebsocketClient({
-      key: env.BYBIT_API_KEY,
-      secret: env.BYBIT_API_SECRET,
+      key: creds.apiKey,
+      secret: creds.apiSecret,
       market: 'v5',
-      testnet,
+      testnet: testnet ?? creds.testnet,
     });
 
     this.ws.on('update', (data: any) => this.handleUpdate(data));
@@ -51,37 +53,37 @@ class BybitWebSocketManager extends EventEmitter {
   }
 
   subscribeSymbols(symbols: string[], intervals: string[] = ['5', '15']): void {
-    if (!this.ws) {
-      logger.warn('WebSocket not connected — call connect() first');
-      return;
-    }
-    this.subscribedIntervals = intervals;
+    const ivs = [...new Set(intervals.filter(Boolean))];
+    this.subscribedIntervals = [...new Set([...this.subscribedIntervals, ...ivs])];
     for (const symbol of symbols) {
-      if (this.subscribedSymbols.has(symbol)) continue;
+      const existing = this.symbolIntervals.get(symbol) ?? new Set<string>();
+      const fresh = ivs.filter(i => !existing.has(i));
+      fresh.forEach(i => existing.add(i));
+      this.symbolIntervals.set(symbol, existing);
       this.subscribedSymbols.add(symbol);
-      this.ws!.subscribeV5(
-        intervals.flatMap(iv => [`kline.${iv}.${symbol}`]),
-        'linear'
-      );
-      logger.debug('Subscribed WS kline', { symbol, intervals });
+      if (this.ws && fresh.length) {
+        this.ws.subscribeV5(fresh.map(iv => `kline.${iv}.${symbol}`), 'linear');
+        logger.debug('Subscribed WS kline', { symbol, intervals: fresh });
+      }
+    }
+    if (!this.ws) {
+      logger.warn('WebSocket not connected — subscriptions queued until connect');
     }
   }
 
   unsubscribeSymbol(symbol: string): void {
-    if (!this.ws || !this.subscribedSymbols.has(symbol)) return;
+    const ivs = this.symbolIntervals.get(symbol);
     this.subscribedSymbols.delete(symbol);
-    this.ws.unsubscribeV5(
-      this.subscribedIntervals.map(iv => `kline.${iv}.${symbol}`),
-      'linear'
-    );
+    this.symbolIntervals.delete(symbol);
+    if (!this.ws || !ivs) return;
+    this.ws.unsubscribeV5([...ivs].map(iv => `kline.${iv}.${symbol}`), 'linear');
   }
 
   private resubscribeAll(): void {
-    if (!this.ws || this.subscribedSymbols.size === 0) return;
-    const topics = Array.from(this.subscribedSymbols).flatMap(s =>
-      this.subscribedIntervals.map(iv => `kline.${iv}.${s}`)
-    );
-    this.ws!.subscribeV5(topics, 'linear');
+    if (!this.ws || this.symbolIntervals.size === 0) return;
+    for (const [symbol, ivs] of this.symbolIntervals) {
+      this.ws.subscribeV5([...ivs].map(iv => `kline.${iv}.${symbol}`), 'linear');
+    }
   }
 
   private handleUpdate(data: any): void {

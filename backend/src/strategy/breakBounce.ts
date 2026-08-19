@@ -76,6 +76,22 @@ export class BreakBounceEngine extends EventEmitter {
 
   updateConfig(config: AppConfig): void {
     this.config = config;
+    for (const sc of config.symbols) {
+      if (sc.enabled) this.ensureSymbol(sc.symbol);
+    }
+  }
+
+  ensureSymbol(symbol: string): void {
+    if (this.states.has(symbol)) return;
+    this.states.set(symbol, {
+      symbol,
+      dailyRange: null,
+      candles15m: [],
+      candles5m: [],
+      activeBreakout: null,
+      activeRetest: null,
+      tradesCountToday: 0,
+    });
   }
 
   /**

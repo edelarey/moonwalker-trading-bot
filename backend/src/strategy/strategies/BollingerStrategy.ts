@@ -39,7 +39,7 @@ export class BollingerStrategy implements IStrategy {
 
   describe(): string { return `Bollinger Bands (${this.params.mode}): ${this.params.period}-period, ${this.params.stdDevMultiplier}σ.`; }
   defaultParams(): BollingerParams {
-    return { period: 20, stdDevMultiplier: 2.0, timeframe: '60', mode: 'mean_reversion', volumeConfirmMultiplier: 1.5, squeezeThresholdPercent: 2.0, stopLossPercent: 3, takeProfitPercent: 6, trailingStopPercent: 3 };
+    return { period: 20, stdDevMultiplier: 2.0, timeframe: '240', mode: 'breakout', volumeConfirmMultiplier: 1.5, squeezeThresholdPercent: 2.0, stopLossPercent: 3, takeProfitPercent: 6, trailingStopPercent: 3 };
   }
 
   onCandle(symbol: string, candle: Candle, interval: string): StrategySignal | null {

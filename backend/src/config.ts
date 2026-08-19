@@ -20,21 +20,74 @@ const DEFAULT_CONFIG: AppConfig = {
   riskPercent: 1,
   tpMultiplier: 2.5,
   liquidityWindowStart: '00:00',
-  liquidityWindowEnd: '02:30',
+  liquidityWindowEnd: '04:00',
   maxDailyTradesPerCoin: 1,
   storageMode: (process.env.STORAGE_MODE as 'json' | 'postgres') || 'json',
   testnet: process.env.BYBIT_TESTNET === 'true',
-  breakoutBufferPercent: 0.05,
+  breakoutBufferPercent: 0.08,
   primaryTimeframe: 'D',
   breakoutTimeframe: '15',
   entryTimeframe: '5',
+  tradingMode: 'paper',
+  paperStartingEquity: 10000,
+  paperFeeBps: 6,
+  paperSlippageBps: 3,
+  strategyDefaults: {
+    break_bounce: {
+      primaryTimeframe: 'D', breakoutTimeframe: '15', entryTimeframe: '5',
+      breakoutBufferPercent: 0.08, liquidityWindowStart: '00:00', liquidityWindowEnd: '04:00', tpMultiplier: 2.5,
+    },
+    dca: {
+      investmentAmount: 50, intervalMinutes: 1440, maxTotalInvestment: 500,
+      takeProfitPercent: 15, trailingStopPercent: 8, maFilterPeriod: 50, rsiFilterMax: 45,
+    },
+    grid: {
+      upperPrice: 0, lowerPrice: 0, gridCount: 12, investmentPerGrid: 50,
+      geometric: true, stopLossBreakoutPercent: 4, leverage: 1,
+    },
+    ma_crossover: {
+      shortPeriod: 20, longPeriod: 50, timeframe: '240',
+      stopLossPercent: 3, takeProfitPercent: 8, trailingStopPercent: 4,
+    },
+    rsi: {
+      period: 14, oversoldThreshold: 20, overboughtThreshold: 80, timeframe: '60',
+      confirmationCandles: 2, stopLossPercent: 2.5, takeProfitPercent: 5,
+    },
+    bollinger: {
+      period: 20, stdDevMultiplier: 2.0, timeframe: '240', mode: 'breakout',
+      volumeConfirmMultiplier: 1.5, squeezeThresholdPercent: 2.0,
+      stopLossPercent: 3, takeProfitPercent: 6, trailingStopPercent: 3,
+    },
+    donchian: {
+      period: 20, timeframe: '240', atrPeriod: 14, atrMultiplier: 2.5, takeProfitAtrMultiplier: 4,
+    },
+    ema_pullback: {
+      fastPeriod: 9, slowPeriod: 21, timeframe: '15', stopLossPercent: 2, takeProfitPercent: 4,
+    },
+    supertrend: { atrPeriod: 10, multiplier: 2, timeframe: '15' },
+    vwap: {
+      timeframe: '5', deviationPercent: 0.6, stopLossPercent: 1.2, takeProfitPercent: 0.8, sessionResetHour: 0,
+    },
+    orb: {
+      rangeMinutes: 30, timeframe: '5', breakoutBufferPercent: 0.08,
+      takeProfitRr: 2, sessionStartHour: 0, maxTradesPerDay: 1,
+    },
+  },
 };
 
 export function loadConfig(): AppConfig {
   if (fs.existsSync(configPath)) {
     try {
       const raw = fs.readFileSync(configPath, 'utf-8');
-      return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+      const saved = JSON.parse(raw) as Partial<AppConfig>;
+      return {
+        ...DEFAULT_CONFIG,
+        ...saved,
+        strategyDefaults: {
+          ...DEFAULT_CONFIG.strategyDefaults,
+          ...(saved.strategyDefaults ?? {}),
+        },
+      };
     } catch {
       return DEFAULT_CONFIG;
     }

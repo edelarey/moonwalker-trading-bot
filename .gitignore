@@ -14,8 +14,9 @@ frontend/node_modules/
 backend/dist/
 frontend/dist/
 
-# Runtime data (json storage)
+# Runtime data (json storage) — includes encrypted API keys
 backend/data/*.json
+backend/data/secrets.json
 !backend/data/*.json.example
 !backend/data/config.json.example
 !backend/data/trades.json.example

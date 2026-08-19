@@ -1,18 +1,25 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import { loadConfig, saveConfig } from '../config';
 import { store } from '../storage/store';
 import { runBacktest } from '../backtest/engine';
 import { refreshDailyRanges } from '../scheduler/cron';
 import { wsManager } from '../bybit/websocket';
-import { getOpenPositions, closePosition, getAccountEquity } from '../bybit/client';
+import { getOpenPositions, closePosition, getAccountEquity, fetchTopLinearMarkets, resetBybitClient } from '../bybit/client';
 import { logger } from '../logger';
-import { BacktestParams, StrategyInstance, StrategyType } from '../types';
+import { ALL_STRATEGY_TYPES, BacktestParams, MAX_ENABLED_SYMBOLS, StrategyInstance, StrategyType } from '../types';
+import { clearStoredKeys, getApiKeyStatus, hasApiKeys, saveStoredKeys } from '../security/secrets';
 import { Parser } from 'json2csv';
 import { strategyRegistry } from '../strategy/registry';
 import { getStrategyInstances, saveStrategyInstance, deleteStrategyInstance } from '../storage/strategyStore';
+import { activateStrategy, deactivateStrategy, syncEngineSymbols, syncSubscriptions } from '../strategy/runtime';
+import { paperBroker } from '../execution/paperBroker';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
+
+function tradingMode(): 'paper' | 'live' {
+  return loadConfig().tradingMode ?? 'paper';
+}
 
 // --- Config ---
 router.get('/config', (_req: Request, res: Response) => {
@@ -23,19 +30,21 @@ router.put('/config', (req: Request, res: Response) => {
   try {
     const current = loadConfig();
     const updated = { ...current, ...req.body };
-    // Cap enabled symbols at 20: if incoming symbols array has more than 20 enabled,
-    // keep the first 20 enabled and force the rest to disabled.
+    if (updated.tradingMode === 'live' && !hasApiKeys()) {
+      return res.status(400).json({ error: 'Save Bybit API keys in Settings before switching to live' }) as any;
+    }
     if (Array.isArray(updated.symbols)) {
       let enabledSeen = 0;
       updated.symbols = updated.symbols.map((s: { symbol: string; enabled: boolean; addedAt: number }) => {
         if (s.enabled) {
-          if (enabledSeen < 20) { enabledSeen++; return s; }
+          if (enabledSeen < MAX_ENABLED_SYMBOLS) { enabledSeen++; return s; }
           return { ...s, enabled: false };
         }
         return s;
       });
     }
     saveConfig(updated);
+    syncSubscriptions();
     res.json(updated);
   } catch (_err) {
     res.status(400).json({ error: 'Invalid config' });
@@ -51,20 +60,45 @@ router.post('/symbols', (req: Request, res: Response) => {
   const config = loadConfig();
   const { symbol } = req.body as { symbol: string };
   if (!symbol) return res.status(400).json({ error: 'symbol required' }) as any;
-  // 409 only for duplicates — there is no total-list size limit.
   if (config.symbols.find(s => s.symbol === symbol)) {
     return res.status(409).json({ error: 'Symbol already exists' }) as any;
   }
-  // Only actively track (subscribe via WebSocket) if fewer than 20 symbols are already enabled.
-  // If the active limit is reached the symbol is added as disabled (inactive) so it sits in the
-  // list without consuming API quota until the user enables it manually.
   const enabledCount = config.symbols.filter(s => s.enabled).length;
-  const willBeEnabled = enabledCount < 20;
+  const willBeEnabled = enabledCount < MAX_ENABLED_SYMBOLS;
   const upper = symbol.toUpperCase();
   config.symbols.push({ symbol: upper, enabled: willBeEnabled, addedAt: Date.now() });
   saveConfig(config);
-  if (willBeEnabled) wsManager.subscribeSymbols([upper]);
+  if (willBeEnabled) {
+    syncEngineSymbols();
+    syncSubscriptions();
+  }
   res.status(201).json(config.symbols);
+});
+
+router.post('/symbols/bulk', (req: Request, res: Response) => {
+  const config = loadConfig();
+  const incoming = (req.body?.symbols as string[] | undefined) ?? [];
+  const enable = req.body?.enabled !== false;
+  let enabledCount = config.symbols.filter(s => s.enabled).length;
+  for (const raw of incoming) {
+    const symbol = String(raw).toUpperCase();
+    if (!symbol.endsWith('USDT')) continue;
+    const existing = config.symbols.find(s => s.symbol === symbol);
+    if (existing) {
+      if (enable && !existing.enabled && enabledCount < MAX_ENABLED_SYMBOLS) {
+        existing.enabled = true;
+        enabledCount++;
+      }
+    } else {
+      const willEnable = enable && enabledCount < MAX_ENABLED_SYMBOLS;
+      config.symbols.push({ symbol, enabled: willEnable, addedAt: Date.now() });
+      if (willEnable) enabledCount++;
+    }
+  }
+  saveConfig(config);
+  syncEngineSymbols();
+  syncSubscriptions();
+  res.json(config.symbols);
 });
 
 router.delete('/symbols/:symbol', (req: Request, res: Response) => {
@@ -94,9 +128,52 @@ router.get('/trades', (_req: Request, res: Response) => {
   res.json(store.getTrades());
 });
 
+router.get('/markets/top', async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(100, Math.max(10, parseInt(String(req.query.limit || '50'), 10) || 50));
+    const markets = await fetchTopLinearMarkets(limit);
+    res.json(markets);
+  } catch (err: any) {
+    logger.error('Failed to fetch top markets', { err });
+    res.status(500).json({ error: err.message || 'Failed to fetch Bybit markets' });
+  }
+});
+
+router.get('/keys', (_req: Request, res: Response) => {
+  res.json(getApiKeyStatus());
+});
+
+router.put('/keys', (req: Request, res: Response) => {
+  const { apiKey, apiSecret, testnet, label } = req.body as {
+    apiKey?: string; apiSecret?: string; testnet?: boolean; label?: string;
+  };
+  if (!apiKey || !apiSecret) {
+    return res.status(400).json({ error: 'apiKey and apiSecret are required' }) as any;
+  }
+  const status = saveStoredKeys({
+    apiKey,
+    apiSecret,
+    testnet: Boolean(testnet),
+    label,
+  });
+  resetBybitClient();
+  res.json(status);
+});
+
+router.delete('/keys', (_req: Request, res: Response) => {
+  clearStoredKeys();
+  resetBybitClient();
+  const current = loadConfig();
+  if (current.tradingMode === 'live') {
+    current.tradingMode = 'paper';
+    saveConfig(current);
+  }
+  res.json(getApiKeyStatus());
+});
+
 router.get('/trades/export-csv', (_req: Request, res: Response) => {
   const trades = store.getTrades();
-  const fields = ['id', 'symbol', 'direction', 'entryPrice', 'closePrice', 'pnl', 'status', 'openedAt', 'closedAt'];
+  const fields = ['id', 'symbol', 'direction', 'entryPrice', 'closePrice', 'pnl', 'status', 'openedAt', 'closedAt', 'mode', 'strategyType'];
   const parser = new Parser({ fields });
   const csv = parser.parse(trades);
   res.header('Content-Type', 'text/csv');
@@ -107,6 +184,9 @@ router.get('/trades/export-csv', (_req: Request, res: Response) => {
 // --- Positions ---
 router.get('/positions', async (_req: Request, res: Response) => {
   try {
+    if (tradingMode() === 'paper') {
+      return res.json(paperBroker.getPositions()) as any;
+    }
     const positions = await getOpenPositions();
     res.json(positions);
   } catch (_err) {
@@ -116,7 +196,17 @@ router.get('/positions', async (_req: Request, res: Response) => {
 
 router.post('/positions/:symbol/close', async (req: Request, res: Response) => {
   try {
-    const { side, qty } = req.body as { side: 'Buy' | 'Sell'; qty: string };
+    const { side, qty, tradeId } = req.body as { side?: 'Buy' | 'Sell'; qty?: string; tradeId?: string };
+    if (tradingMode() === 'paper') {
+      if (tradeId) {
+        const closed = paperBroker.closeById(tradeId);
+        if (!closed) return res.status(404).json({ error: 'Paper position not found' }) as any;
+        return res.json({ trade: closed }) as any;
+      }
+      const closed = paperBroker.closeSymbol(req.params.symbol);
+      return res.json({ closed: closed.length, trades: closed }) as any;
+    }
+    if (!side || !qty) return res.status(400).json({ error: 'side and qty required' }) as any;
     const orderId = await closePosition(req.params.symbol, side, qty);
     res.json({ orderId });
   } catch (err: any) {
@@ -127,11 +217,24 @@ router.post('/positions/:symbol/close', async (req: Request, res: Response) => {
 // --- Account ---
 router.get('/account/equity', async (_req: Request, res: Response) => {
   try {
+    if (tradingMode() === 'paper') {
+      const snap = paperBroker.getSnapshot();
+      return res.json(snap) as any;
+    }
     const equity = await getAccountEquity();
-    res.json({ equity });
+    res.json({ equity, mode: 'live' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+router.get('/paper/account', (_req: Request, res: Response) => {
+  res.json(paperBroker.getSnapshot());
+});
+
+router.post('/paper/reset', (req: Request, res: Response) => {
+  const starting = typeof req.body?.startingEquity === 'number' ? req.body.startingEquity : undefined;
+  res.json(paperBroker.reset(starting));
 });
 
 // --- Backtesting ---
@@ -162,6 +265,18 @@ router.get('/backtest/results/:id/export-csv', (req: Request, res: Response) => 
   res.send(csv);
 });
 
+function parseInstanceBody(body: Record<string, unknown>, existing?: StrategyInstance): Omit<StrategyInstance, 'id' | 'createdAt' | 'updatedAt'> {
+  const strategyType = (body.strategyType || body.type || existing?.strategyType) as StrategyType;
+  return {
+    name: String(body.name ?? existing?.name ?? 'Untitled'),
+    strategyType,
+    symbols: (body.symbols as string[]) ?? existing?.symbols ?? [],
+    params: (body.params as Record<string, unknown>) ?? existing?.params ?? {},
+    enabled: body.enabled != null ? Boolean(body.enabled) : existing?.enabled ?? false,
+    autoMode: body.autoMode != null ? Boolean(body.autoMode) : existing?.autoMode ?? false,
+  };
+}
+
 // --- Strategy Instances ---
 router.get('/strategies', (_req: Request, res: Response) => {
   res.json(getStrategyInstances());
@@ -169,39 +284,42 @@ router.get('/strategies', (_req: Request, res: Response) => {
 
 router.get('/strategies/defaults/:type', (req: Request, res: Response) => {
   const type = req.params.type as StrategyType;
-  const validTypes: StrategyType[] = ['break_bounce', 'dca', 'grid', 'ma_crossover', 'rsi', 'bollinger'];
-  if (!validTypes.includes(type)) {
+  if (!ALL_STRATEGY_TYPES.includes(type)) {
     return res.status(404).json({ error: `Unknown strategy type: ${type}` }) as any;
   }
   const config = loadConfig();
   if (config.strategyDefaults && config.strategyDefaults[type]) {
     return res.json(config.strategyDefaults[type]) as any;
   }
-  // Fallback to hardcoded defaults from registry
   try {
-    const defaults = strategyRegistry.getDefaultParams(type);
-    res.json(defaults);
+    res.json(strategyRegistry.getDefaultParams(type));
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 });
 
-router.post('/strategies', (req: Request, res: Response) => {
-  const body = req.body as Omit<StrategyInstance, 'id' | 'createdAt' | 'updatedAt'>;
+router.post('/strategies', async (req: Request, res: Response) => {
+  const body = parseInstanceBody(req.body);
   const inst: StrategyInstance = { ...body, id: uuidv4(), createdAt: Date.now(), updatedAt: Date.now() };
   saveStrategyInstance(inst);
-  res.status(201).json(inst);
+  const saved = getStrategyInstances().find(s => s.id === inst.id)!;
+  await activateStrategy(saved);
+  res.status(201).json(saved);
 });
 
-router.put('/strategies/:id', (req: Request, res: Response) => {
+router.put('/strategies/:id', async (req: Request, res: Response) => {
   const existing = getStrategyInstances().find(s => s.id === req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' }) as any;
-  const updated: StrategyInstance = { ...existing, ...req.body, id: existing.id, updatedAt: Date.now() };
+  const body = parseInstanceBody(req.body, existing);
+  const updated: StrategyInstance = { ...existing, ...body, id: existing.id, updatedAt: Date.now() };
   saveStrategyInstance(updated);
-  res.json(updated);
+  const saved = getStrategyInstances().find(s => s.id === updated.id)!;
+  await activateStrategy(saved);
+  res.json(saved);
 });
 
 router.delete('/strategies/:id', (req: Request, res: Response) => {
+  deactivateStrategy(req.params.id);
   deleteStrategyInstance(req.params.id);
   res.json({ ok: true });
 });
@@ -210,7 +328,18 @@ router.post('/strategies/:id/backtest', async (req: Request, res: Response) => {
   const inst = getStrategyInstances().find(s => s.id === req.params.id);
   if (!inst) return res.status(404).json({ error: 'Not found' }) as any;
   try {
-    const result = await strategyRegistry.runBacktest(inst, { ...req.body, params: inst.params });
+    const config = loadConfig();
+    const symbols: string[] = req.body.symbols?.length
+      ? req.body.symbols
+      : (inst.symbols.length ? inst.symbols : config.symbols.filter(s => s.enabled).map(s => s.symbol));
+    const result = await strategyRegistry.runBacktest(inst, {
+      symbols,
+      startDate: req.body.startDate,
+      endDate: req.body.endDate,
+      params: inst.params,
+      riskPercent: req.body.riskPercent ?? config.riskPercent,
+      startingEquity: req.body.startingEquity ?? config.paperStartingEquity ?? 10_000,
+    });
     res.json(result);
   } catch (err: any) {
     logger.error('Strategy backtest failed', { err });

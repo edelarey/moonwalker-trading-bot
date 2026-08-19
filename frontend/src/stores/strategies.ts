@@ -1,62 +1,30 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import type { StrategyType } from '@/api/client'
 
-export type StrategyType = 'break_bounce' | 'dca' | 'grid' | 'ma_crossover' | 'rsi' | 'bollinger'
+export type { StrategyType }
 
 export interface StrategySignal {
   strategyId: string
   strategyName: string
   symbol: string
-  signal: 'buy' | 'sell' | 'hold'
+  signal: 'buy' | 'sell' | 'hold' | 'entry' | 'exit'
   price: number
   timestamp: string
   metadata: Record<string, any>
 }
 
-export interface DCAParams {
-  investmentAmount: number
-  intervalHours: number
-  maxPositions: number
-  takeProfitPct: number
-  stopLossPct: number
-}
-
-export interface GridParams {
-  upperPrice: number
-  lowerPrice: number
-  gridLevels: number
-  investmentPerGrid: number
-}
-
-export interface MACrossoverParams {
-  fastPeriod: number
-  slowPeriod: number
-  signalPeriod: number
-  timeframe: string
-}
-
-export interface RSIParams {
-  period: number
-  overbought: number
-  oversold: number
-  timeframe: string
-}
-
-export interface BollingerParams {
-  period: number
-  stdDev: number
-  timeframe: string
-}
-
 export interface StrategyInstance {
   id: string
   name: string
-  type: StrategyType
+  strategyType: StrategyType
+  type?: StrategyType
   symbols: string[]
-  params: DCAParams | GridParams | MACrossoverParams | RSIParams | BollingerParams | Record<string, any>
+  params: Record<string, any>
   enabled: boolean
-  createdAt: string
-  updatedAt: string
+  autoMode: boolean
+  createdAt: number | string
+  updatedAt: number | string
 }
 
 export interface BacktestResult {
@@ -71,21 +39,27 @@ export interface BacktestResult {
 
 export interface CreateInstancePayload {
   name: string
-  type: StrategyType
+  strategyType: StrategyType
   symbols: string[]
   params: Record<string, any>
   enabled: boolean
+  autoMode?: boolean
 }
 
 export interface UpdateInstancePayload {
   name?: string
-  type?: StrategyType
+  strategyType?: StrategyType
   symbols?: string[]
   params?: Record<string, any>
   enabled?: boolean
+  autoMode?: boolean
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
+
+export function instanceType(inst: { strategyType?: StrategyType; type?: StrategyType }): StrategyType {
+  return inst.strategyType || inst.type || 'break_bounce'
+}
 
 export const useStrategiesStore = defineStore('strategies', () => {
   const instances = ref<StrategyInstance[]>([])
@@ -202,11 +176,8 @@ export const useStrategiesStore = defineStore('strategies', () => {
   ): void {
     const existing = backtestResults.value.findIndex(r => r.strategyId === strategyId)
     const entry: BacktestResult = { strategyId, strategyName, type, ...result }
-    if (existing !== -1) {
-      backtestResults.value[existing] = entry
-    } else {
-      backtestResults.value.push(entry)
-    }
+    if (existing !== -1) backtestResults.value[existing] = entry
+    else backtestResults.value.push(entry)
   }
 
   function clearBacktestResults(): void {

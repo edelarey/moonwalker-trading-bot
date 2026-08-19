@@ -1,18 +1,23 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { tradesApi, positionsApi, accountApi, type Trade } from '@/api/client'
+import { tradesApi, positionsApi, accountApi, paperApi, type Trade, type PaperAccountSnapshot } from '@/api/client'
 
 export const useTradesStore = defineStore('trades', () => {
   const trades = ref<Trade[]>([])
   const positions = ref<any[]>([])
   const equity = ref<number>(0)
+  const paper = ref<PaperAccountSnapshot | null>(null)
   const loading = ref(false)
 
   const openTrades = computed(() => trades.value.filter(t => t.status === 'open'))
   const closedTrades = computed(() => trades.value.filter(t => t.status !== 'open'))
-  const totalPnl = computed(() => trades.value.reduce((s, t) => s + (t.pnl ?? 0), 0))
+  const paperTrades = computed(() => trades.value.filter(t => (t.mode ?? 'paper') === 'paper' && !t.isBacktest))
+  const totalPnl = computed(() => {
+    if (paper.value) return paper.value.realizedPnl + paper.value.unrealizedPnl
+    return trades.value.reduce((s, t) => s + (t.pnl ?? 0), 0)
+  })
   const winRate = computed(() => {
-    const closed = closedTrades.value
+    const closed = closedTrades.value.filter(t => !t.isBacktest)
     if (!closed.length) return 0
     return closed.filter(t => (t.pnl ?? 0) > 0).length / closed.length
   })
@@ -27,12 +32,34 @@ export const useTradesStore = defineStore('trades', () => {
   }
 
   async function fetchEquity() {
-    try { const { equity: eq } = await accountApi.equity(); equity.value = eq } catch { /* ignore */ }
+    try {
+      const data = await accountApi.equity()
+      equity.value = data.equity
+      if (data.mode === 'paper' || data.startingEquity != null) {
+        paper.value = {
+          mode: 'paper',
+          startingEquity: data.startingEquity ?? 10000,
+          equity: data.equity,
+          cashEquity: data.cashEquity ?? data.equity,
+          realizedPnl: data.realizedPnl ?? 0,
+          unrealizedPnl: data.unrealizedPnl ?? 0,
+          totalFees: data.totalFees ?? 0,
+          openCount: data.openCount ?? 0,
+          updatedAt: data.updatedAt ?? Date.now(),
+        }
+      }
+    } catch { /* ignore */ }
   }
 
-  async function closePosition(symbol: string, side: string, qty: string) {
-    await positionsApi.close(symbol, side, qty)
-    await fetchPositions()
+  async function resetPaper(startingEquity?: number) {
+    paper.value = await paperApi.reset(startingEquity)
+    equity.value = paper.value.equity
+    await Promise.all([fetchTrades(), fetchPositions()])
+  }
+
+  async function closePosition(symbol: string, side: string, qty: string, tradeId?: string) {
+    await positionsApi.close(symbol, side, qty, tradeId)
+    await Promise.all([fetchPositions(), fetchTrades(), fetchEquity()])
   }
 
   function addTrade(trade: Trade) {
@@ -41,9 +68,14 @@ export const useTradesStore = defineStore('trades', () => {
     else trades.value.unshift(trade)
   }
 
+  function setPaperAccount(snap: PaperAccountSnapshot) {
+    paper.value = snap
+    equity.value = snap.equity
+  }
+
   return {
-    trades, positions, equity, loading,
-    openTrades, closedTrades, totalPnl, winRate,
-    fetchTrades, fetchPositions, fetchEquity, closePosition, addTrade,
+    trades, positions, equity, paper, loading,
+    openTrades, closedTrades, paperTrades, totalPnl, winRate,
+    fetchTrades, fetchPositions, fetchEquity, resetPaper, closePosition, addTrade, setPaperAccount,
   }
 })
