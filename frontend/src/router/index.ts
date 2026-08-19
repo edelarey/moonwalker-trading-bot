@@ -16,6 +16,7 @@ const router = createRouter({
     { path: '/positions', component: Positions, meta: { title: 'Positions' } },
     { path: '/backtest', component: Backtest, meta: { title: 'Backtest' } },
     { path: '/backtest/results', component: BacktestResults, meta: { title: 'Backtest Results' } },
+    { path: '/sweep', component: () => import('@/views/Sweep.vue'), meta: { title: 'Sweep' } },
     { path: '/strategies/results', redirect: '/backtest/results' },
     { path: '/settings', component: Settings, meta: { title: 'Settings' } },
     { path: '/help', component: () => import('@/views/Help.vue'), meta: { title: 'Help' } },

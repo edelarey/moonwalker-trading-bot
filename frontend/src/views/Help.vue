@@ -12,6 +12,7 @@ const faqs = [
   { q: 'Do hedge strategies send live orders?', a: 'dynamic_delta and drawdown_hedge send a Bybit USDT-perp hedge. funding_arb live only shorts the perp (you must hold spot yourself). cross_exchange live only hedges on Bybit — no Binance order is sent. Paper simulates the full idea for all four.' },
   { q: 'Will the Dashboard show my BTC or XRP balance?', a: 'Paper always shows virtual USDT. Live shows one number: the Unified USDT coin line (default), or Bybit totalMarginBalance in USD if Settings → Equity source is Total Unified USD collateral. BTC/XRP only count in that second mode after you enable them as collateral on Bybit and use Cross or Portfolio. Isolated still needs USDT. These contracts still settle PnL in USDT.' },
   { q: 'What date format do backtest ranges use?', a: 'Day first: dd-mm-YYYY (for example 19-08-2026). Type it or use the calendar button. Saved results show the same format. The API still stores ISO YYYY-MM-DD internally.' },
+  { q: 'Does Sweep pick the best live strategy?', a: 'No. Sweep runs a small fixed parameter grid and ranks on a holdout window. The top score is “survived this sample,” not an edge. It never turns Auto on or sends live orders. Clone makes a new Off row only.' },
 ]
 </script>
 
@@ -246,6 +247,27 @@ const faqs = [
           </table>
         </div>
         <div class="alert text-xs py-2"><span>⚠ Past performance does not guarantee future results. Backtest results are simulated and do not account for slippage or exchange fees.</span></div>
+      </div>
+    </details>
+
+    <details class="group bg-base-200 border border-base-300 rounded-xl overflow-hidden">
+      <summary class="flex items-center justify-between px-5 py-4 cursor-pointer font-semibold text-base select-none list-none hover:bg-base-300 transition-colors">
+        <span>📐 Sweep (parameter compare)</span>
+        <span class="text-lg transition-transform duration-200 group-open:rotate-180">▼</span>
+      </summary>
+      <div class="px-5 pb-5 pt-3 border-t border-base-300 space-y-3 text-sm text-base-content/80">
+        <p>
+          <strong>Sweep</strong> in the sidebar runs the same backtest engine many times: a few common starting grids per directional type, same coins, same risk %, same stop fill.
+          Each candidate is run on the <strong>in-sample</strong> window and again on a later <strong>holdout</strong> window (default last ~30% of the range).
+        </p>
+        <ul class="list-disc list-inside space-y-1 text-xs">
+          <li>Hedges, grid, and DCA are not in the sweep — they are not comparable as simple directional perps.</li>
+          <li>Holdout score needs at least 8 holdout trades. It uses profit factor, trade count, and MaxDD % — not in-sample PnL.</li>
+          <li>Do not pick a row because in-sample profit is huge.</li>
+          <li><strong>Clone as new row</strong> copies params to a new Strategy Manager instance. Off, Auto off. Existing rows are untouched. Nothing goes live.</li>
+          <li>A full sweep of every type is tens of backtests and can take several minutes (klines are cached per symbol/timeframe).</li>
+        </ul>
+        <p class="text-xs text-base-content/60">This is not an optimizer and does not claim the top row will be profitable live. Paper the clone before considering live.</p>
       </div>
     </details>
 

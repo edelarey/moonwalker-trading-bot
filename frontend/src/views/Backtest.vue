@@ -158,6 +158,8 @@ function formatParamValue(key: string, val: unknown): string {
     <h1 class="text-2xl font-bold">🧪 Backtesting Engine</h1>
     <p class="text-sm text-base-content/60">
       Pick any strategy — including Break &amp; Bounce — and run it with the params saved in Strategy Manager.
+      To compare several types and parameter grids on a holdout window, use
+      <router-link to="/sweep" class="link link-primary">Sweep</router-link>.
     </p>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">

@@ -80,6 +80,7 @@ Hedge defaults:
 ### Backtests
 
 - **Backtest** page: pick any strategy instance, including Break & Bounce. Only **BTCUSDT** is selected until you add coins. Dates, coins, and risk % are remembered in the browser. Date ranges use **dd-mm-YYYY** (day first) in the form and on results.
+- **Sweep** page: runs a small fixed grid of common starting params for directional types (not hedges/grid/DCA). Ranks on a **holdout** window. Highest in-sample PnL is not the goal. Clone copies params to a **new Off** Strategy Manager row — never overwrites, never enables Auto or live.
 - PnL is ending equity − start (default **$10,000**). **MaxDD** is the worst peak-to-trough on the closed-trade book in USDT — not the per-trade stop %. Signal backtests exit at **candle close**, which can overshoot the stop; leftover opens are marked at the last close.
 - Results live at **BT Results** (`/backtest/results`). `/strategies/results` redirects there.
 
@@ -213,6 +214,7 @@ Strategy-specific params are edited per instance in Strategy Manager.
 | **Trading** | Paper/Live switch and **all strategies** (including Break & Bounce) with On / Auto / coin chips. Strategy rules live in Strategy Manager; account size defaults in Settings |
 | **Positions** | Open book + full history (filter paper/live, coin, strategy); CSV export |
 | **Backtest** | Historical run for any strategy instance (including Break & Bounce); BTCUSDT default; form remembered; date range **dd-mm-YYYY** |
+| **Sweep** | Small preset grids × directional types; in-sample + holdout compare. Does **not** pick a live winner or enable Auto. Clone makes a new Off row |
 | **BT Results** | Summary metrics (incl. MaxDD USDT and %), equity curve, trade list |
 | **Strategy Manager** | Create/edit/reset-defaults/delete instances, deploy paper, run backtests |
 | **Settings** | Mode switch, live equity source, paper reset, clear trade/backtest history, **sub-account keys**, risk % / sizing |
@@ -280,6 +282,7 @@ Signals (Break & Bounce reversals and registry `entry`/`exit`) go through `execu
 | GET | `/api/strategies/defaults/:type` | Factory starting params for a type |
 | POST | `/api/strategies/:id/reset-defaults` | Restore factory params (keeps name/coins/On/Auto) |
 | POST | `/api/strategies/:id/backtest` | Instance backtest |
+| GET/POST | `/api/sweep`, `/api/sweep/run`, `/api/sweep/cancel`, `/api/sweep/clone` | Parameter sweep job (holdout compare; clone is Off/Auto off) |
 | DELETE | `/api/trades` / `/api/backtest/results` | Clear history (see Settings) |
 
 ### WebSocket (`ws://localhost:3001/ws`, proxied as `/ws` on 5180)

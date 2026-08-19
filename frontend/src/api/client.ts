@@ -228,3 +228,55 @@ export const backtestApi = {
   remove: (id: string) => api.delete<{ ok: boolean }>(`/backtest/results/${id}`).then(r => r.data),
   exportCsv: (id: string) => { window.open(`/api/backtest/results/${id}/export-csv`, '_blank') },
 }
+
+export interface SweepSlice {
+  startDate: string
+  endDate: string
+  totalTrades: number
+  winRate: number
+  totalPnl: number
+  maxDrawdown: number
+  maxDrawdownPercent: number
+  profitFactor: number | null
+}
+export interface SweepCandidate {
+  id: string
+  strategyType: StrategyType
+  typeName: string
+  label: string
+  params: Record<string, unknown>
+  inSample: SweepSlice | null
+  holdout: SweepSlice | null
+  holdoutScore: number | null
+  error?: string
+}
+export interface SweepJob {
+  id: string
+  status: 'running' | 'done' | 'cancelled' | 'error'
+  request: {
+    symbols: string[]
+    startDate: string
+    endDate: string
+    holdoutStart: string
+    types: StrategyType[]
+    riskPercent: number
+    stopFillMode: 'stop_price' | 'bar_close'
+    startingEquity: number
+  }
+  total: number
+  done: number
+  currentLabel: string
+  startedAt: number
+  finishedAt: number | null
+  candidates: SweepCandidate[]
+  error?: string
+}
+export const sweepApi = {
+  get: () => api.get<SweepJob | null>('/sweep').then(r => r.data),
+  presets: () => api.get<{ types: Array<{ type: StrategyType; name: string; variantCount: number }> }>('/sweep/presets').then(r => r.data),
+  defaultHoldout: (startDate: string, endDate: string) =>
+    api.get<{ holdoutStart: string }>('/sweep/default-holdout', { params: { startDate, endDate } }).then(r => r.data),
+  run: (body: Record<string, unknown>) => api.post<SweepJob>('/sweep/run', body).then(r => r.data),
+  cancel: () => api.post<SweepJob | null>('/sweep/cancel').then(r => r.data),
+  clone: (candidateId: string) => api.post<{ id: string; name: string }>('/sweep/clone', { candidateId }).then(r => r.data),
+}

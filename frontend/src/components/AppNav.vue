@@ -14,6 +14,7 @@ const navItems = [
   { path: '/trading', icon: '⚡', label: 'Trading' },
   { path: '/positions', icon: '📋', label: 'Positions' },
   { path: '/backtest', icon: '🧪', label: 'Backtest' },
+  { path: '/sweep', icon: '📐', label: 'Sweep' },
   { path: '/backtest/results', icon: '📈', label: 'Results' },
   { path: '/strategies', icon: '🤖', label: 'Strategy Manager' },
   { path: '/settings', icon: '⚙️', label: 'Settings' },

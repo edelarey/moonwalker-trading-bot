@@ -155,6 +155,13 @@ export async function fetchBinanceLast(symbol: string): Promise<number | null> {
 }
 
 /** Page through Bybit klines so a multi-week range is not truncated at 1000 bars. */
+const rangeCache = new Map<string, Candle[]>();
+const RANGE_CACHE_MAX = 48;
+
+export function clearCandleRangeCache(): void {
+  rangeCache.clear();
+}
+
 export async function fetchCandlesRange(
   symbol: string,
   interval: CandleInterval,
@@ -162,6 +169,10 @@ export async function fetchCandlesRange(
   endTime: number,
   category: 'linear' | 'spot' = 'linear',
 ): Promise<Candle[]> {
+  const cacheKey = `${category}|${symbol}|${interval}|${startTime}|${endTime}`;
+  const hit = rangeCache.get(cacheKey);
+  if (hit) return hit.map(c => ({ ...c }));
+
   const step = intervalToMs(String(interval));
   const out: Candle[] = [];
   let cursor = startTime;
@@ -181,7 +192,13 @@ export async function fetchCandlesRange(
   }
   const byTime = new Map<number, Candle>();
   for (const c of out) byTime.set(c.openTime, c);
-  return [...byTime.values()].sort((a, b) => a.openTime - b.openTime);
+  const candles = [...byTime.values()].sort((a, b) => a.openTime - b.openTime);
+  if (rangeCache.size >= RANGE_CACHE_MAX) {
+    const first = rangeCache.keys().next().value;
+    if (first) rangeCache.delete(first);
+  }
+  rangeCache.set(cacheKey, candles);
+  return candles.map(c => ({ ...c }));
 }
 
 /**

@@ -16,6 +16,7 @@ import { resolveStopFillMode } from '../strategy/stopFill';
 import { paperBroker } from '../execution/paperBroker';
 import { v4 as uuidv4 } from 'uuid';
 import { toIsoDate } from '../util/dates';
+import { cancelSweep, cloneSweepCandidate, getSweepJob, startSweep, sweepPresets, defaultHoldoutStart } from '../strategy/sweepJob';
 
 const router = Router();
 
@@ -417,6 +418,48 @@ router.post('/strategies/:id/backtest', async (req: Request, res: Response) => {
   } catch (err: any) {
     logger.error('Strategy backtest failed', { err });
     res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Parameter sweep (compare grids; does not enable Auto or live) ---
+router.get('/sweep', (_req: Request, res: Response) => {
+  res.json(getSweepJob());
+});
+
+router.get('/sweep/presets', (_req: Request, res: Response) => {
+  res.json({ types: sweepPresets() });
+});
+
+router.get('/sweep/default-holdout', (req: Request, res: Response) => {
+  const startDate = toIsoDate(req.query.startDate);
+  const endDate = toIsoDate(req.query.endDate);
+  if (!startDate || !endDate) return res.status(400).json({ error: 'startDate and endDate required' }) as any;
+  res.json({ holdoutStart: defaultHoldoutStart(startDate, endDate) });
+});
+
+router.post('/sweep/run', (req: Request, res: Response) => {
+  try {
+    const created = startSweep(req.body as Record<string, unknown>);
+    res.status(202).json(created);
+  } catch (err: any) {
+    const msg = err?.message ?? 'Sweep failed';
+    const code = msg.includes('already running') ? 409 : 400;
+    res.status(code).json({ error: msg });
+  }
+});
+
+router.post('/sweep/cancel', (_req: Request, res: Response) => {
+  res.json(cancelSweep());
+});
+
+router.post('/sweep/clone', (req: Request, res: Response) => {
+  try {
+    const id = String(req.body?.candidateId ?? '');
+    if (!id) return res.status(400).json({ error: 'candidateId required' }) as any;
+    const inst = cloneSweepCandidate(id);
+    res.status(201).json(inst);
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message ?? 'Clone failed' });
   }
 });
 
