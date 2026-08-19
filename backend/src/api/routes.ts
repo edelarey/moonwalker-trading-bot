@@ -12,6 +12,7 @@ import { Parser } from 'json2csv';
 import { strategyRegistry } from '../strategy/registry';
 import { getStrategyInstances, saveStrategyInstance, deleteStrategyInstance, resetStrategyParams, factoryParamsFor } from '../storage/strategyStore';
 import { activateStrategy, deactivateStrategy, syncEngineSymbols, syncSubscriptions } from '../strategy/runtime';
+import { resolveStopFillMode } from '../strategy/stopFill';
 import { paperBroker } from '../execution/paperBroker';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -385,6 +386,7 @@ router.post('/strategies/:id/backtest', async (req: Request, res: Response) => {
         sizingMode: config.sizingMode ?? 'risk_percent',
         fixedPositionUsdt: config.fixedPositionUsdt ?? 100,
         strategyParams: { ...(inst.params as Record<string, unknown>) },
+        stopFillMode: resolveStopFillMode(inst.params as Record<string, unknown>, config.stopFillMode),
       },
       trades: result.trades,
       summary: result.summary,

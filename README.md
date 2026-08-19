@@ -188,6 +188,7 @@ The Vite dev server proxies `/api` and `/ws` to the backend, so this is only nee
 | `tradingMode` | `paper` | `paper` or `live` |
 | `riskPercent` | `1` | % of equity risked per sized trade |
 | `leverage` | `1` | Perp multiplier (1–100). Strategy instance can override. Fixed USDT notional = USDT × leverage |
+| `stopFillMode` | `bar_close` | Backtest SL/TP: `stop_price` fills when the bar trades through the level; `bar_close` waits for the close. Per-strategy override in Strategy Manager. Live always uses exchange stops. |
 | `tpMultiplier` | `2.5` | Break & Bounce take-profit = risk × this |
 | `liquidityWindowStart` / `End` | `00:00` / `04:00` UTC | Break & Bounce entry window |
 | `maxDailyTradesPerCoin` | `1` | Break & Bounce cap |

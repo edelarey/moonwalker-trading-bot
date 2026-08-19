@@ -58,6 +58,7 @@ export type TradeStatus = 'open' | 'closed_tp' | 'closed_sl' | 'closed_manual';
 export type TradingMode = 'paper' | 'live';
 export type TradeMode = 'paper' | 'live' | 'backtest';
 export type SizingMode = 'risk_percent' | 'fixed_usdt';
+export type StopFillMode = 'stop_price' | 'bar_close';
 
 export interface Trade {
   id: string;
@@ -105,6 +106,7 @@ export interface AppConfig {
   sizingMode?: SizingMode;
   fixedPositionUsdt?: number; // margin USDT when sizingMode is fixed_usdt (notional = this × leverage)
   leverage?: number;         // default 1 — Bybit-style perp multiplier
+  stopFillMode?: StopFillMode; // default bar_close — stop_price fills SL/TP intrabar
   tpMultiplier: number;      // default 2.5
   liquidityWindowStart: string;  // HH:MM UTC, default "00:00"
   liquidityWindowEnd: string;    // HH:MM UTC, default "02:30"
@@ -169,6 +171,7 @@ export interface BacktestParams {
   sizingMode?: SizingMode;
   fixedPositionUsdt?: number;
   strategyParams?: Record<string, unknown>;
+  stopFillMode?: StopFillMode;
 }
 
 export interface BacktestResult {

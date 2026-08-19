@@ -5,6 +5,7 @@ import { fetchCandlesRange } from '../bybit/client';
 import { logger } from '../logger';
 import { loadConfig } from '../config';
 import { resolveLeverage, sizePosition } from './riskManager';
+import { fillStopOnBar, resolveStopFillMode } from './stopFill';
 
 export function calcSummary(trades: Trade[], startEquity: number, endEquity: number): BacktestSummary {
   const winners = trades.filter(t => (t.pnl ?? 0) > 0);
@@ -162,6 +163,10 @@ export async function runSignalBacktest(opts: {
     }
 
     const inst = opts.create({ ...opts.instance, params: { ...opts.params.params, timeframe: tf }, symbols: [symbol] });
+    const stopFillMode = resolveStopFillMode(
+      opts.params.params as Record<string, unknown>,
+      loadConfig().stopFillMode,
+    );
     let entryPrice = 0;
     let entryTime = 0;
     let entryDir: 'bullish' | 'bearish' = 'bullish';
@@ -171,8 +176,18 @@ export async function runSignalBacktest(opts: {
 
     for (const c of candles) {
       last = c;
+      if (entryPrice > 0 && stopFillMode === 'stop_price') {
+        const fill = fillStopOnBar({ direction: entryDir, stopLoss: sl, takeProfit: tp, candle: c });
+        if (fill) {
+          closeTrade(symbol, entryPrice, entryTime, entryDir, sl, tp, fill.price, c.openTime, c.high, c.low);
+          entryPrice = 0;
+          inst.clearPosition?.(symbol);
+          inst.onCandle(symbol, c, tf);
+          continue;
+        }
+      }
       const sig = inst.onCandle(symbol, c, tf);
-      if (sig?.type === 'entry') {
+      if (sig?.type === 'entry' && entryPrice === 0) {
         entryPrice = sig.price;
         entryTime = c.openTime;
         entryDir = sig.direction ?? 'bullish';

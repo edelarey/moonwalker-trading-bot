@@ -76,6 +76,7 @@ const runSettings = computed<{ label: string; value: string }[]>(() => {
     { label: 'Sizing', value: p.sizingMode === 'fixed_usdt'
       ? `Fixed ${p.fixedPositionUsdt ?? '—'} USDT × lev`
       : (p.sizingMode ?? 'risk_percent') },
+    { label: 'Stop fill', value: p.stopFillMode === 'stop_price' ? 'At stop price' : 'At candle close' },
   ]
   const strat = p.strategyParams ?? {}
   for (const [k, v] of Object.entries(strat)) {

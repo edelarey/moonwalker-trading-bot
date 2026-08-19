@@ -112,6 +112,14 @@ export class VwapStrategy implements IStrategy {
     return null;
   }
 
+  clearPosition(symbol: string): void {
+    const s = this.state.get(symbol);
+    if (s) {
+      s.inPosition = null;
+      this.state.set(symbol, s);
+    }
+  }
+
   backtest(params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
     const p = params.params as unknown as VwapParams;
     return runSignalBacktest({

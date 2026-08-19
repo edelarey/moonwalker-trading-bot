@@ -88,6 +88,10 @@ export class MACrossoverStrategy implements IStrategy {
     return null;
   }
 
+  clearPosition(symbol: string): void {
+    this.inPosition.set(symbol, false);
+  }
+
   backtest(params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
     const p = params.params as unknown as MACrossoverParams;
     return runSignalBacktest({

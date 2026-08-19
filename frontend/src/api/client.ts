@@ -56,6 +56,7 @@ export interface AppConfig {
   sizingMode?: 'risk_percent' | 'fixed_usdt'
   fixedPositionUsdt?: number
   leverage?: number
+  stopFillMode?: 'stop_price' | 'bar_close'
   tpMultiplier: number
   liquidityWindowStart: string
   liquidityWindowEnd: string
@@ -128,6 +129,7 @@ export interface BacktestParams {
   sizingMode?: 'risk_percent' | 'fixed_usdt'
   fixedPositionUsdt?: number
   strategyParams?: Record<string, unknown>
+  stopFillMode?: 'stop_price' | 'bar_close'
 }
 export interface BacktestSummary {
   totalTrades: number; winningTrades: number; losingTrades: number

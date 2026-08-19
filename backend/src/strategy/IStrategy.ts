@@ -20,6 +20,9 @@ export interface IStrategy {
 
   /** Default parameter values for this strategy type */
   defaultParams(): Record<string, unknown>;
+
+  /** Flatten internal position state (used when the backtest fills a stop intrabar). */
+  clearPosition?(symbol: string): void;
 }
 
 export interface BacktestStrategyParams {

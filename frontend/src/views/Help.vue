@@ -224,7 +224,8 @@ const faqs = [
           <li>Strategy params are read-only here — edit them in Strategy Manager</li>
           <li>Click <strong>▶ Run Backtest</strong>. Results open at <strong>BT Results</strong> (same page as Strategy Results)</li>
           <li>PnL is ending equity − start (default $10,000). MaxDD is the worst peak-to-trough on the closed-trade book, in USDT</li>
-          <li>Each result lists the <strong>settings used for that run</strong> (strategy params, risk %, leverage) plus size / leverage / qty on every trade</li>
+          <li>Each result lists the <strong>settings used for that run</strong> (strategy params, risk %, leverage, stop fill) plus size / leverage / qty on every trade</li>
+          <li><strong>Stop fill</strong> (Settings or per strategy): fill at stop price when the bar trades through SL/TP, or only at candle close. Live always uses exchange stops.</li>
         </ol>
         <div class="overflow-x-auto">
           <table class="table table-sm">

@@ -58,7 +58,9 @@ function toggleFormSymbol(sym: string) {
 const paramsForType = ref<StrategyType | null>(null)
 
 function snapshotParams(): Record<string, any> {
-  return JSON.parse(JSON.stringify(formParams.value ?? {}))
+  const p = JSON.parse(JSON.stringify(formParams.value ?? {})) as Record<string, any>
+  if (p.stopFillMode === '' || p.stopFillMode == null) delete p.stopFillMode
+  return p
 }
 
 function canonTf(raw: unknown): string {
@@ -446,11 +448,21 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
 
           <div class="border border-base-300 rounded-lg p-3 space-y-2">
             <div class="text-sm font-semibold text-base-content/70">Parameters</div>
-            <label class="form-control">
-              <span class="label-text text-xs">Leverage</span>
-              <input type="number" min="1" max="100" step="1" v-model.number="formParams.leverage" class="input input-bordered input-xs" />
-              <span class="label-text-alt text-xs text-base-content/40">Leave empty to use the account default in Settings. 1 = unlevered notional.</span>
-            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="form-control">
+                <span class="label-text text-xs">Leverage</span>
+                <input type="number" min="1" max="100" step="1" v-model.number="formParams.leverage" class="input input-bordered input-xs" />
+                <span class="label-text-alt text-xs text-base-content/40">Empty = Settings default.</span>
+              </label>
+              <label class="form-control">
+                <span class="label-text text-xs">Stop fill (backtest)</span>
+                <select v-model="formParams.stopFillMode" class="select select-bordered select-sm w-full h-10 min-h-10 leading-10 py-0">
+                  <option value="">Account default</option>
+                  <option value="stop_price">Fill at stop price</option>
+                  <option value="bar_close">Fill at candle close</option>
+                </select>
+              </label>
+            </div>
 
             <template v-if="formType === 'break_bounce'">
               <div class="grid grid-cols-2 gap-2">

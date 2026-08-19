@@ -174,6 +174,20 @@ async function resetPaper() {
               />
               <span class="label-text-alt text-xs mt-1 text-base-content/40">1 = no leverage. Strategy editor can override per instance.</span>
             </label>
+            <label class="form-control sm:col-span-2">
+              <span class="label-text text-xs mb-1">Stop fill (backtest default)</span>
+              <select
+                class="select select-bordered select-sm w-full"
+                :value="config.config.stopFillMode ?? 'bar_close'"
+                @change="config.updateConfig({ stopFillMode: ($event.target as HTMLSelectElement).value as 'stop_price' | 'bar_close' })"
+              >
+                <option value="stop_price">Fill at stop price (when the bar trades through SL/TP)</option>
+                <option value="bar_close">Fill at candle close (only if the close is through SL/TP)</option>
+              </select>
+              <span class="label-text-alt text-xs mt-1 text-base-content/40">
+                Each strategy can override this. Live orders always use exchange stops. Default is candle close (previous engine behaviour).
+              </span>
+            </label>
           </div>
         </div>
 

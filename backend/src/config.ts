@@ -21,6 +21,7 @@ const DEFAULT_CONFIG: AppConfig = {
   sizingMode: 'risk_percent',
   fixedPositionUsdt: 100,
   leverage: 1,
+  stopFillMode: 'bar_close',
   tpMultiplier: 2.5,
   liquidityWindowStart: '00:00',
   liquidityWindowEnd: '04:00',

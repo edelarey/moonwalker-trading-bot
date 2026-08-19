@@ -91,6 +91,10 @@ export class EmaPullbackStrategy implements IStrategy {
     return null;
   }
 
+  clearPosition(symbol: string): void {
+    this.inPosition.set(symbol, null);
+  }
+
   backtest(params: BacktestStrategyParams): Promise<StrategyBacktestResult> {
     const p = params.params as unknown as EmaPullbackParams;
     return runSignalBacktest({
