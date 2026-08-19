@@ -51,19 +51,8 @@ const options = computed(() => {
 </script>
 
 <template>
-  <select class="tf-select select select-bordered w-full" v-model="current">
+  <select class="select select-bordered select-readable w-full" v-model="current">
     <option disabled value="">Select timeframe</option>
     <option v-for="tf in options" :key="tf.value" :value="tf.value">{{ tf.label }}</option>
   </select>
 </template>
-
-<style scoped>
-.tf-select {
-  height: 2.5rem;
-  min-height: 2.5rem;
-  line-height: 2.5rem;
-  padding-top: 0;
-  padding-bottom: 0;
-  overflow: visible;
-}
-</style>

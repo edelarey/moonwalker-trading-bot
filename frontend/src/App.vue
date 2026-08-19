@@ -24,7 +24,11 @@ const { connected } = useWebSocket((msg) => {
   if (msg.type === 'breakout') marketStore.addBreakout(msg.signal)
   else if (msg.type === 'retest') marketStore.addRetest(msg.signal)
   else if (msg.type === 'reversal') marketStore.addReversal(msg.signal)
-  else if (msg.type === 'trade_opened' || msg.type === 'trade_closed') tradesStore.addTrade(msg.trade)
+  else if (msg.type === 'trade_opened' || msg.type === 'trade_closed') {
+    tradesStore.addTrade(msg.trade)
+    void tradesStore.fetchPositions()
+    void tradesStore.fetchEquity()
+  }
   else if (msg.type === 'paper_account') tradesStore.setPaperAccount(msg.account)
 })
 </script>

@@ -13,4 +13,40 @@
   .stat-down { @apply text-loss font-semibold; }
   .badge-bullish { @apply badge badge-success badge-sm; }
   .badge-bearish { @apply badge badge-error badge-sm; }
+  /* DaisyUI select-xs/sm + tailwind forms clips the selected label */
+  .select-readable {
+    height: 2.5rem;
+    min-height: 2.5rem;
+    line-height: 2.5rem;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  /* Keep DaisyUI toggle colors visible while focused (forms plugin + night theme) */
+  .toggle:focus,
+  .toggle:focus-visible,
+  .toggle:active {
+    outline: 2px solid hsl(var(--bc) / 0.35);
+    outline-offset: 2px;
+    box-shadow: none !important;
+    --tw-ring-shadow: 0 0 #0000;
+    --tw-ring-offset-shadow: 0 0 #0000;
+  }
+  .toggle-warning:checked:focus,
+  .toggle-warning:checked:focus-visible {
+    background-color: hsl(var(--wa));
+  }
+  .toggle-success:checked:focus,
+  .toggle-success:checked:focus-visible {
+    background-color: hsl(var(--su));
+  }
+  .toggle-primary:checked:focus,
+  .toggle-primary:checked:focus-visible {
+    background-color: hsl(var(--p));
+  }
+  .btn-success:focus,
+  .btn-success:focus-visible {
+    background-color: hsl(var(--su));
+    color: hsl(var(--suc));
+    border-color: hsl(var(--su));
+  }
 }

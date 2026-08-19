@@ -20,6 +20,27 @@ onMounted(() => {
 
 const isPaper = computed(() => (config.config?.tradingMode ?? 'paper') === 'paper')
 const history = computed(() => trades.trades.filter(t => !t.isBacktest))
+const paperOpenFromTrades = computed(() =>
+  trades.trades.filter(t => t.status === 'open' && !t.isBacktest && (t.mode ?? 'paper') === 'paper'),
+)
+const openRows = computed(() => {
+  if (isPaper.value && trades.positions.length) return trades.positions
+  if (isPaper.value && paperOpenFromTrades.value.length) {
+    return paperOpenFromTrades.value.map(t => ({
+      tradeId: t.id,
+      symbol: t.symbol,
+      side: t.direction === 'bullish' ? 'Buy' : 'Sell',
+      size: String(t.qty),
+      avgPrice: String(t.entryPrice),
+      markPrice: String(t.entryPrice),
+      unrealisedPnl: String(t.pnl ?? 0),
+      stopLoss: String(t.stopLoss),
+      takeProfit: String(t.takeProfit),
+      strategyType: t.strategyType,
+    }))
+  }
+  return trades.positions
+})
 const symbolsInHistory = computed(() => [...new Set(history.value.map(t => t.symbol))].sort())
 const strategiesInHistory = computed(() => [...new Set(history.value.map(t => t.strategyType).filter(Boolean) as string[])].sort())
 const filteredHistory = computed(() => history.value.filter(t => {
@@ -76,13 +97,17 @@ async function clearHistory() {
     <div class="card bg-base-200 border border-base-300">
       <div class="card-body p-4">
         <h2 class="card-title text-base">Open Positions</h2>
+        <p class="text-xs text-base-content/50 mb-2">
+          Paper fills show here and in history below when a strategy is <strong>On + Auto</strong> and a live candle fires an entry.
+          Backtests never appear on this page — they stay under Results.
+        </p>
         <div class="overflow-x-auto">
-          <table v-if="trades.positions.length" class="table table-sm">
+          <table v-if="openRows.length" class="table table-sm">
             <thead><tr>
               <th>Symbol</th><th>Side</th><th>Size</th><th>Entry</th><th>Mark</th><th>uPnL</th><th>SL</th><th>TP</th><th>Strategy</th><th>Action</th>
             </tr></thead>
             <tbody>
-              <tr v-for="p in trades.positions" :key="p.tradeId || p.symbol" class="hover">
+              <tr v-for="p in openRows" :key="p.tradeId || p.symbol" class="hover">
                 <td class="font-mono font-bold">{{ p.symbol }}</td>
                 <td><span :class="p.side === 'Buy' ? 'badge-bullish' : 'badge-bearish'">{{ p.side }}</span></td>
                 <td class="font-mono">{{ p.size }}</td>
@@ -120,16 +145,16 @@ async function clearHistory() {
           Paper and live fills are stored locally. Use <strong>Clear history</strong> when you want a clean book. That does not delete backtests.
         </p>
         <div class="flex flex-wrap gap-2 mb-3">
-          <select v-model="filterMode" class="select select-bordered select-xs">
+          <select v-model="filterMode" class="select select-bordered select-readable min-w-[9rem]">
             <option value="all">All modes</option>
             <option value="paper">Paper</option>
             <option value="live">Live</option>
           </select>
-          <select v-model="filterSymbol" class="select select-bordered select-xs">
+          <select v-model="filterSymbol" class="select select-bordered select-readable min-w-[9rem]">
             <option value="">All coins</option>
             <option v-for="s in symbolsInHistory" :key="s" :value="s">{{ s }}</option>
           </select>
-          <select v-model="filterStrategy" class="select select-bordered select-xs">
+          <select v-model="filterStrategy" class="select select-bordered select-readable min-w-[11rem]">
             <option value="">All strategies</option>
             <option v-for="s in strategiesInHistory" :key="s" :value="s">{{ s }}</option>
           </select>
@@ -144,8 +169,9 @@ async function clearHistory() {
             </tbody>
           </table>
           <p v-else class="text-center text-base-content/40 py-4 text-sm">
-            No paper or live fills yet. History is only written when <strong>Auto</strong> is on and a signal fills.
-            Backtests do not appear here — open <router-link to="/backtest/results" class="link">Results</router-link>.
+            No paper or live fills yet. Turn a strategy <strong>On</strong> and <strong>Auto</strong> on Trading (not just a backtest).
+            Fills land in <strong>Open Positions</strong> above, then here when they close.
+            Backtests stay on <router-link to="/backtest/results" class="link">Results</router-link>.
           </p>
         </div>
       </div>

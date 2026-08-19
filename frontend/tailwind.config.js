@@ -10,7 +10,7 @@ export default {
       },
     },
   },
-  plugins: [require('daisyui'), require('@tailwindcss/forms')],
+  plugins: [require('daisyui'), require('@tailwindcss/forms')({ strategy: 'class' })],
   daisyui: {
     themes: ['night', 'light'],
     defaultTheme: 'night',

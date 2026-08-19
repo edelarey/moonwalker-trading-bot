@@ -84,6 +84,8 @@ export async function warmupStrategy(strategy: IStrategy): Promise<void> {
     try {
       const candles = await fetchCandles(symbol, tf, 250);
       for (const c of candles) strategy.onCandle(symbol, c, tf);
+      // Warmup only seeds indicators. Leave flat so live Auto can open a real paper fill.
+      strategy.clearPosition?.(symbol);
     } catch (err) {
       logger.warn('Strategy warmup failed', { id: strategy.id, symbol, err });
     }

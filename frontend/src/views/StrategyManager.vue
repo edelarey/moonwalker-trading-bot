@@ -203,9 +203,16 @@ async function toggleAuto(inst: StrategyInstance) {
   await store.updateInstance(inst.id, { autoMode: !inst.autoMode, enabled: true })
 }
 
+function isDeployed(inst: StrategyInstance) {
+  return !!(inst.enabled && inst.autoMode)
+}
+
 async function deployPaper(inst: StrategyInstance) {
+  if (isDeployed(inst)) {
+    await store.updateInstance(inst.id, { enabled: false, autoMode: false })
+    return
+  }
   await store.updateInstance(inst.id, { enabled: true, autoMode: true })
-  router.push('/trading')
 }
 
 function goBacktest(inst: StrategyInstance) {
@@ -313,15 +320,21 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
           <div class="flex flex-wrap gap-1 mt-1">
             <button class="btn btn-xs btn-outline" @click="openEdit(inst)">Edit</button>
             <button class="btn btn-xs btn-outline" @click="requestReset(inst.id)">Reset defaults</button>
-            <button class="btn btn-xs" :class="inst.autoMode ? 'btn-success' : 'btn-outline'" @click="toggleAuto(inst)">
+            <button type="button" class="btn btn-xs" :class="inst.autoMode ? 'btn-success' : 'btn-outline'" @click="toggleAuto(inst)">
               {{ inst.autoMode ? 'Auto on' : 'Auto off' }}
             </button>
             <button class="btn btn-xs btn-error btn-outline" @click="requestDelete(inst.id)">Delete</button>
             <button class="btn btn-xs btn-info btn-outline" @click="toggleBacktestPanel(inst)">
               {{ backtestPanelId === inst.id ? 'Close BT' : 'Run Backtest' }}
             </button>
-            <button class="btn btn-xs btn-success" @click="deployPaper(inst)">
-              {{ isPaper ? '▶ Deploy paper' : '▶ Deploy live' }}
+            <button
+              class="btn btn-xs"
+              :class="isDeployed(inst) ? 'btn-success' : 'btn-outline'"
+              @click="deployPaper(inst)"
+            >
+              {{ isDeployed(inst)
+                ? (isPaper ? '■ Stop paper' : '■ Stop live')
+                : (isPaper ? '▶ Deploy paper' : '▶ Deploy live') }}
             </button>
             <button class="btn btn-xs btn-info" @click="goBacktest(inst)">🧪 Backtest</button>
           </div>
@@ -555,7 +568,7 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">Period</span><input type="number" v-model.number="formParams.period" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Std dev</span><input type="number" v-model.number="formParams.stdDevMultiplier" class="input input-bordered input-xs" step="0.1" /></label>
                 <label class="form-control"><span class="label-text text-xs">Mode</span>
-                  <select v-model="formParams.mode" class="select select-bordered select-xs">
+                  <select v-model="formParams.mode" class="select select-bordered select-readable w-full">
                     <option value="mean_reversion">Mean reversion</option>
                     <option value="breakout">Breakout</option>
                   </select>
