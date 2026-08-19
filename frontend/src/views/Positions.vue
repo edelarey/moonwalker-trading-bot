@@ -137,7 +137,7 @@ async function clearHistory() {
         <div class="overflow-x-auto">
           <table v-if="filteredHistory.length" class="table table-sm">
             <thead><tr>
-              <th>Symbol</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>PnL</th><th>Strategy</th><th>Status</th><th>Time</th>
+              <th>Symbol</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>Size USDT</th><th>Lev</th><th>Qty</th><th>PnL</th><th>Strategy</th><th>Status</th><th>Time</th>
             </tr></thead>
             <tbody>
               <TradeRow v-for="t in filteredHistory" :key="t.id" :trade="t" />

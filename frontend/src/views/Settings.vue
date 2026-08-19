@@ -156,13 +156,23 @@ async function resetPaper() {
               />
             </label>
             <label class="form-control">
-              <span class="label-text text-xs mb-1">USDT notional per trade</span>
+              <span class="label-text text-xs mb-1">USDT per trade (margin if leveraged)</span>
               <input
                 type="number" step="10" min="1"
                 class="input input-bordered input-sm"
                 :value="config.config.fixedPositionUsdt ?? 100"
                 @change="config.updateConfig({ fixedPositionUsdt: parseFloat(($event.target as HTMLInputElement).value) })"
               />
+            </label>
+            <label class="form-control">
+              <span class="label-text text-xs mb-1">Leverage</span>
+              <input
+                type="number" step="1" min="1" max="100"
+                class="input input-bordered input-sm"
+                :value="config.config.leverage ?? 1"
+                @change="config.updateConfig({ leverage: parseFloat(($event.target as HTMLInputElement).value) })"
+              />
+              <span class="label-text-alt text-xs mt-1 text-base-content/40">1 = no leverage. Strategy editor can override per instance.</span>
             </label>
           </div>
         </div>

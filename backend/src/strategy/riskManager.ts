@@ -36,6 +36,22 @@ function calcTakeProfit(
  * Calculate position size in USDT given risk % and SL distance.
  * positionSize = (equity * riskPercent / 100) / (riskDistance / entryPrice)
  */
+export function clampLeverage(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(100, Math.round(n * 10) / 10);
+}
+
+export function resolveLeverage(
+  instParams?: Record<string, unknown>,
+  fallback?: unknown,
+): number {
+  if (instParams && instParams.leverage != null && instParams.leverage !== '') {
+    return clampLeverage(instParams.leverage);
+  }
+  return clampLeverage(fallback ?? 1);
+}
+
 export function calcPositionSize(
   equity: number,
   riskPercent: number,
@@ -57,12 +73,16 @@ export function sizePosition(opts: {
   riskPercent: number;
   sizingMode?: 'risk_percent' | 'fixed_usdt';
   fixedPositionUsdt?: number;
-}): { positionSize: number; qty: number } {
+  leverage?: number;
+}): { positionSize: number; qty: number; leverage: number } {
+  const leverage = clampLeverage(opts.leverage ?? 1);
   if (opts.sizingMode === 'fixed_usdt') {
-    const positionSize = Math.max(1, Number(opts.fixedPositionUsdt) || 100);
-    return { positionSize, qty: positionSize / opts.entryPrice };
+    const margin = Math.max(1, Number(opts.fixedPositionUsdt) || 100);
+    const positionSize = margin * leverage;
+    return { positionSize, qty: positionSize / opts.entryPrice, leverage };
   }
-  return calcPositionSize(opts.equity, opts.riskPercent, opts.entryPrice, opts.stopLoss);
+  const sized = calcPositionSize(opts.equity, opts.riskPercent, opts.entryPrice, opts.stopLoss);
+  return { ...sized, leverage };
 }
 
 /**

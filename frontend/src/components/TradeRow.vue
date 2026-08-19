@@ -10,6 +10,10 @@ function pnlClass(pnl?: number) {
   if (!pnl) return ''
   return pnl > 0 ? 'text-profit' : 'text-loss'
 }
+function fmt(n: number | undefined, digits = 2) {
+  if (n == null || !Number.isFinite(n)) return '—'
+  return n.toFixed(digits)
+}
 </script>
 
 <template>
@@ -27,6 +31,9 @@ function pnlClass(pnl?: number) {
     <td class="font-mono">{{ trade.entryPrice.toFixed(4) }}</td>
     <td class="font-mono text-loss">{{ trade.stopLoss.toFixed(4) }}</td>
     <td class="font-mono text-profit">{{ trade.takeProfit.toFixed(4) }}</td>
+    <td class="font-mono whitespace-nowrap">{{ fmt(trade.positionSize, 0) }}</td>
+    <td class="font-mono">{{ trade.leverage != null ? trade.leverage + '×' : '—' }}</td>
+    <td class="font-mono text-xs">{{ fmt(trade.qty, 5) }}</td>
     <td :class="pnlClass(trade.pnl)" class="font-mono">
       {{ trade.pnl !== undefined ? (trade.pnl > 0 ? '+' : '') + trade.pnl.toFixed(2) : '—' }}
     </td>

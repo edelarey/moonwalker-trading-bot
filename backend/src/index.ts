@@ -12,7 +12,7 @@ import apiRouter from './api/routes';
 import { errorHandler, requestLogger } from './api/middleware';
 import { strategyRegistry } from './strategy/registry';
 import { getStrategyInstances, seedDefaultStrategies } from './storage/strategyStore';
-import { activateStrategy, collectRequiredIntervals, enabledSymbols, setBreakBounceEngine, syncSubscriptions } from './strategy/runtime';
+import { activateStrategy, breakBounceLiveConfig, collectRequiredIntervals, enabledSymbols, setBreakBounceEngine, syncSubscriptions } from './strategy/runtime';
 import { resolveApiCredentials } from './security/secrets';
 import {
   handleStrategySignal,
@@ -72,10 +72,10 @@ async function boot(): Promise<void> {
 
     processPaperCandle(update.symbol, update.candle);
 
-    const currentConfig = loadConfig();
-    if (update.interval === currentConfig.breakoutTimeframe) {
+    const bb = breakBounceLiveConfig();
+    if (update.interval === bb.breakoutTimeframe) {
       engine.process15mCandle(update.symbol, update.candle);
-    } else if (update.interval === currentConfig.entryTimeframe) {
+    } else if (update.interval === bb.entryTimeframe) {
       engine.process5mCandle(update.symbol, update.candle);
     }
 

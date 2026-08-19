@@ -280,7 +280,7 @@ router.delete('/backtest/results/:id', (req: Request, res: Response) => {
 router.get('/backtest/results/:id/export-csv', (req: Request, res: Response) => {
   const result = store.getBacktestResults().find(r => r.id === req.params.id);
   if (!result) return res.status(404).json({ error: 'Not found' }) as any;
-  const fields = ['id', 'symbol', 'direction', 'entryPrice', 'closePrice', 'pnl', 'pnlPercent', 'status', 'patternType', 'openedAt', 'closedAt'];
+  const fields = ['id', 'symbol', 'direction', 'entryPrice', 'closePrice', 'stopLoss', 'takeProfit', 'positionSize', 'leverage', 'qty', 'pnl', 'pnlPercent', 'status', 'patternType', 'openedAt', 'closedAt'];
   const parser = new Parser({ fields });
   const csv = parser.parse(result.trades);
   res.header('Content-Type', 'text/csv');
@@ -358,6 +358,9 @@ router.post('/strategies/:id/backtest', async (req: Request, res: Response) => {
     const symbols: string[] = req.body.symbols?.length
       ? req.body.symbols
       : (inst.symbols.length ? inst.symbols : config.symbols.filter(s => s.enabled).map(s => s.symbol));
+    const leverage = Number(req.body.leverage) > 0
+      ? Number(req.body.leverage)
+      : (Number((inst.params as Record<string, unknown>)?.leverage) || config.leverage || 1);
     const result = await strategyRegistry.runBacktest(inst, {
       symbols,
       startDate: req.body.startDate,
@@ -365,6 +368,7 @@ router.post('/strategies/:id/backtest', async (req: Request, res: Response) => {
       params: inst.params,
       riskPercent: req.body.riskPercent ?? config.riskPercent,
       startingEquity: req.body.startingEquity ?? config.paperStartingEquity ?? 10_000,
+      leverage,
     });
     const saved = {
       id: uuidv4(),
@@ -377,6 +381,10 @@ router.post('/strategies/:id/backtest', async (req: Request, res: Response) => {
         liquidityWindowStart: config.liquidityWindowStart,
         liquidityWindowEnd: config.liquidityWindowEnd,
         breakoutBufferPercent: config.breakoutBufferPercent,
+        leverage,
+        sizingMode: config.sizingMode ?? 'risk_percent',
+        fixedPositionUsdt: config.fixedPositionUsdt ?? 100,
+        strategyParams: { ...(inst.params as Record<string, unknown>) },
       },
       trades: result.trades,
       summary: result.summary,

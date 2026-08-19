@@ -446,6 +446,11 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
 
           <div class="border border-base-300 rounded-lg p-3 space-y-2">
             <div class="text-sm font-semibold text-base-content/70">Parameters</div>
+            <label class="form-control">
+              <span class="label-text text-xs">Leverage</span>
+              <input type="number" min="1" max="100" step="1" v-model.number="formParams.leverage" class="input input-bordered input-xs" />
+              <span class="label-text-alt text-xs text-base-content/40">Leave empty to use the account default in Settings. 1 = unlevered notional.</span>
+            </label>
 
             <template v-if="formType === 'break_bounce'">
               <div class="grid grid-cols-2 gap-2">
@@ -465,7 +470,8 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                 <label class="form-control"><span class="label-text text-xs">TP multiplier</span><input type="number" step="0.1" v-model.number="formParams.tpMultiplier" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Buffer %</span><input type="number" step="0.01" v-model.number="formParams.breakoutBufferPercent" class="input input-bordered input-xs" /></label>
                 <label class="form-control"><span class="label-text text-xs">Window start UTC</span><input type="time" v-model="formParams.liquidityWindowStart" class="input input-bordered input-xs" /></label>
-                <label class="form-control col-span-2"><span class="label-text text-xs">Window end UTC</span><input type="time" v-model="formParams.liquidityWindowEnd" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Window end UTC</span><input type="time" v-model="formParams.liquidityWindowEnd" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Max trades / coin / day</span><input type="number" min="1" v-model.number="formParams.maxTradesPerDay" class="input input-bordered input-xs" /></label>
               </div>
             </template>
 

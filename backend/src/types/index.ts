@@ -68,7 +68,8 @@ export interface Trade {
   takeProfit: number;
   riskDistance: number;
   riskPercent: number;
-  positionSize: number;   // in USDT
+  positionSize: number;   // notional USDT
+  leverage?: number;      // perp multiplier used for this fill
   qty: number;            // in coin units
   openedAt: number;       // Unix ms
   closedAt?: number;
@@ -102,7 +103,8 @@ export interface AppConfig {
   symbols: SymbolConfig[];
   riskPercent: number;       // default 1 — used when sizingMode is risk_percent
   sizingMode?: SizingMode;
-  fixedPositionUsdt?: number; // notional USDT per trade when sizingMode is fixed_usdt
+  fixedPositionUsdt?: number; // margin USDT when sizingMode is fixed_usdt (notional = this × leverage)
+  leverage?: number;         // default 1 — Bybit-style perp multiplier
   tpMultiplier: number;      // default 2.5
   liquidityWindowStart: string;  // HH:MM UTC, default "00:00"
   liquidityWindowEnd: string;    // HH:MM UTC, default "02:30"
@@ -163,6 +165,10 @@ export interface BacktestParams {
   primaryTimeframe?: 'D' | 'W' | 'M';
   breakoutTimeframe?: string;
   entryTimeframe?: string;
+  leverage?: number;
+  sizingMode?: SizingMode;
+  fixedPositionUsdt?: number;
+  strategyParams?: Record<string, unknown>;
 }
 
 export interface BacktestResult {

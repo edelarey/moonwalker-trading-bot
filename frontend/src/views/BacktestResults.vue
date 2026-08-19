@@ -57,6 +57,33 @@ function fmtNum(n: number | null | undefined, digits = 2, fallback = '—'): str
   if (typeof n !== 'number' || !Number.isFinite(n)) return fallback
   return n.toFixed(digits)
 }
+
+function formatKey(key: string): string {
+  return key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())
+}
+
+const runSettings = computed<{ label: string; value: string }[]>(() => {
+  const r = result.value
+  if (!r) return []
+  const p = r.params ?? ({} as typeof r.params)
+  const rows: { label: string; value: string }[] = [
+    { label: 'Strategy', value: label(r) },
+    { label: 'Type', value: String(r.strategyType ?? '—') },
+    { label: 'Symbols', value: (p.symbols ?? []).join(', ') || '—' },
+    { label: 'Range', value: `${p.startDate ?? '—'} → ${p.endDate ?? '—'}` },
+    { label: 'Risk %', value: p.riskPercent != null ? String(p.riskPercent) : '—' },
+    { label: 'Leverage', value: p.leverage != null ? `${p.leverage}×` : '—' },
+    { label: 'Sizing', value: p.sizingMode === 'fixed_usdt'
+      ? `Fixed ${p.fixedPositionUsdt ?? '—'} USDT × lev`
+      : (p.sizingMode ?? 'risk_percent') },
+  ]
+  const strat = p.strategyParams ?? {}
+  for (const [k, v] of Object.entries(strat)) {
+    if (v == null || v === '') continue
+    rows.push({ label: formatKey(k), value: String(v) })
+  }
+  return rows
+})
 </script>
 
 <template>
@@ -108,6 +135,19 @@ function fmtNum(n: number | null | undefined, digits = 2, fallback = '—'): str
     </div>
 
     <template v-else-if="result">
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-4">
+          <h2 class="card-title text-base">Settings used for this run</h2>
+          <p class="text-xs text-base-content/50 mb-2">Snapshot at run time — later edits in Strategy Manager do not change this.</p>
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            <div v-for="row in runSettings" :key="row.label" class="bg-base-300 rounded px-2 py-1">
+              <div class="text-xs text-base-content/50">{{ row.label }}</div>
+              <div class="text-sm font-mono font-semibold break-all">{{ row.value }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div v-if="s" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Trades" :value="s.totalTrades" icon="🔢" />
         <StatCard title="Win Rate" :value="fmtNum(s.winRate != null ? s.winRate * 100 : null, 1) + '%'" :trend="(s.winRate ?? 0) >= 0.5 ? 'up' : 'down'" icon="🎯" />
@@ -132,7 +172,7 @@ function fmtNum(n: number | null | undefined, digits = 2, fallback = '—'): str
           <div class="overflow-x-auto max-h-96">
             <table class="table table-sm">
               <thead class="sticky top-0 bg-base-200"><tr>
-                <th>Symbol</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>PnL</th><th>Strategy</th><th>Status</th><th>Time</th>
+                <th>Symbol</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>Size USDT</th><th>Lev</th><th>Qty</th><th>PnL</th><th>Strategy</th><th>Status</th><th>Time</th>
               </tr></thead>
               <tbody>
                 <TradeRow v-for="t in result.trades" :key="t.id" :trade="t" />

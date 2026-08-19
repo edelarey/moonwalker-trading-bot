@@ -153,13 +153,14 @@ export const useStrategiesStore = defineStore('strategies', () => {
     endDate: string,
     symbols?: string[],
     riskPercent?: number,
+    leverage?: number,
   ): Promise<Record<string, any> | null> {
     error.value = null
     try {
       const res = await fetch(`${API_BASE}/api/strategies/${id}/backtest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDate, endDate, symbols, riskPercent }),
+        body: JSON.stringify({ startDate, endDate, symbols, riskPercent, leverage }),
       })
       if (!res.ok) throw new Error(`Backtest failed: ${res.statusText}`)
       const raw = await res.json()

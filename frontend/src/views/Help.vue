@@ -94,7 +94,7 @@ const faqs = [
         <span class="text-lg transition-transform duration-200 group-open:rotate-180">▼</span>
       </summary>
       <div class="px-5 pb-5 pt-3 border-t border-base-300 space-y-4">
-        <p class="text-sm text-base-content/70">The strategy uses three timeframes in a hierarchy. Each must be configured appropriately for the market conditions you are targeting.</p>
+        <p class="text-sm text-base-content/70">Break &amp; Bounce uses three timeframes. Set them on the <strong>Break &amp; Bounce</strong> row in Strategy Manager (not on Trading).</p>
         <div class="overflow-x-auto">
           <table class="table table-sm">
             <thead><tr><th>Setting</th><th>Default</th><th>Description</th></tr></thead>
@@ -125,6 +125,7 @@ const faqs = [
         <span class="text-lg transition-transform duration-200 group-open:rotate-180">▼</span>
       </summary>
       <div class="px-5 pb-5 pt-3 border-t border-base-300 space-y-3">
+        <p class="text-sm text-base-content/70">Account-wide risk % / size / leverage live in <strong>Settings</strong>. Break &amp; Bounce window, buffer, and TP multiplier live on that strategy in Strategy Manager.</p>
         <div class="overflow-x-auto">
           <table class="table table-sm">
             <thead><tr><th>Setting</th><th>Default</th><th>Description</th></tr></thead>
@@ -223,6 +224,7 @@ const faqs = [
           <li>Strategy params are read-only here — edit them in Strategy Manager</li>
           <li>Click <strong>▶ Run Backtest</strong>. Results open at <strong>BT Results</strong> (same page as Strategy Results)</li>
           <li>PnL is ending equity − start (default $10,000). MaxDD is the worst peak-to-trough on the closed-trade book, in USDT</li>
+          <li>Each result lists the <strong>settings used for that run</strong> (strategy params, risk %, leverage) plus size / leverage / qty on every trade</li>
         </ol>
         <div class="overflow-x-auto">
           <table class="table table-sm">

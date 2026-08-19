@@ -29,6 +29,7 @@ export interface BacktestStrategyParams {
   params: Record<string, unknown>;
   riskPercent: number;
   startingEquity: number;
+  leverage?: number;
 }
 
 export interface StrategyBacktestResult {

@@ -187,6 +187,7 @@ The Vite dev server proxies `/api` and `/ws` to the backend, so this is only nee
 |-----------|---------|-------------|
 | `tradingMode` | `paper` | `paper` or `live` |
 | `riskPercent` | `1` | % of equity risked per sized trade |
+| `leverage` | `1` | Perp multiplier (1–100). Strategy instance can override. Fixed USDT notional = USDT × leverage |
 | `tpMultiplier` | `2.5` | Break & Bounce take-profit = risk × this |
 | `liquidityWindowStart` / `End` | `00:00` / `04:00` UTC | Break & Bounce entry window |
 | `maxDailyTradesPerCoin` | `1` | Break & Bounce cap |
@@ -205,7 +206,7 @@ Strategy-specific params are edited per instance in Strategy Manager.
 |------|-------------|
 | **Dashboard** | Paper/live badge, equity, PnL, breakouts, recent trades |
 | **Coin Scanner** | Top 50 Bybit USDT perps by 24h turnover; enable up to 50; add others manually |
-| **Trading** | Paper/Live switch, shared risk/timeframes, **all strategies** (including Break & Bounce) with On / Auto / coin chips |
+| **Trading** | Paper/Live switch and **all strategies** (including Break & Bounce) with On / Auto / coin chips. Strategy rules live in Strategy Manager; account size defaults in Settings |
 | **Positions** | Open book + full history (filter paper/live, coin, strategy); CSV export |
 | **Backtest** | Historical run for any strategy instance (including Break & Bounce); BTCUSDT default; form remembered |
 | **BT Results** | Summary metrics (incl. MaxDD USDT and %), equity curve, trade list |

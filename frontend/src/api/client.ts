@@ -55,6 +55,7 @@ export interface AppConfig {
   riskPercent: number
   sizingMode?: 'risk_percent' | 'fixed_usdt'
   fixedPositionUsdt?: number
+  leverage?: number
   tpMultiplier: number
   liquidityWindowStart: string
   liquidityWindowEnd: string
@@ -77,7 +78,7 @@ export type Direction = 'bullish' | 'bearish'
 export interface Trade {
   id: string; symbol: string; direction: Direction; entryPrice: number
   stopLoss: number; takeProfit: number; riskDistance: number; riskPercent: number
-  positionSize: number; qty: number; openedAt: number; closedAt?: number
+  positionSize: number; leverage?: number; qty: number; openedAt: number; closedAt?: number
   closePrice?: number; pnl?: number; pnlPercent?: number; fees?: number
   status: TradeStatus
   bybitOrderId?: string; isBacktest: boolean
@@ -123,6 +124,10 @@ export interface BacktestParams {
   primaryTimeframe?: 'D' | 'W' | 'M'
   breakoutTimeframe?: string
   entryTimeframe?: string
+  leverage?: number
+  sizingMode?: 'risk_percent' | 'fixed_usdt'
+  fixedPositionUsdt?: number
+  strategyParams?: Record<string, unknown>
 }
 export interface BacktestSummary {
   totalTrades: number; winningTrades: number; losingTrades: number

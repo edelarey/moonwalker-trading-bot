@@ -168,6 +168,7 @@ function simulateDay(params: {
           riskDistance: signal.riskDistance,
           riskPercent: config.riskPercent,
           positionSize,
+          leverage: config.leverage ?? 1,
           qty,
           openedAt: c5.openTime,
           closedAt,

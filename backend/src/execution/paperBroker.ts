@@ -28,6 +28,7 @@ export interface PaperOpenRequest {
   takeProfit: number;
   qty: number;
   positionSize: number;
+  leverage?: number;
   riskPercent: number;
   strategyInstanceId?: string;
   strategyType?: string;
@@ -153,6 +154,7 @@ export class PaperBroker {
       riskDistance: Math.abs(fill - req.stopLoss),
       riskPercent: req.riskPercent,
       positionSize: req.positionSize,
+      leverage: req.leverage,
       qty,
       openedAt: Date.now(),
       fees: entryFee,

@@ -2,7 +2,7 @@ import { loadConfig } from '../config';
 import { hasApiKeys } from '../security/secrets';
 import { logger } from '../logger';
 import { closePosition, getAccountEquity, placeMarketOrder } from '../bybit/client';
-import { sizePosition } from '../strategy/riskManager';
+import { resolveLeverage, sizePosition } from '../strategy/riskManager';
 import { store } from '../storage/store';
 import { paperBroker } from './paperBroker';
 import {
@@ -42,17 +42,18 @@ function sizeOrder(
   inst: StrategyInstance,
   signal: StrategySignal,
   sl: number,
-): { positionSize: number; qty: number } {
+): { positionSize: number; qty: number; leverage: number } {
   const config = loadConfig();
   const gridInv = signal.metadata?.investmentPerGrid;
   const dcaInv = signal.metadata?.investmentAmount;
+  const leverage = resolveLeverage(inst.params as Record<string, unknown>, config.leverage);
   if (inst.strategyType === 'grid' && gridInv != null) {
     const positionSize = Number(gridInv);
-    return { positionSize, qty: positionSize / signal.price };
+    return { positionSize, qty: positionSize / signal.price, leverage };
   }
   if (inst.strategyType === 'dca' && dcaInv != null) {
     const positionSize = Number(dcaInv);
-    return { positionSize, qty: positionSize / signal.price };
+    return { positionSize, qty: positionSize / signal.price, leverage };
   }
   return sizePosition({
     equity,
@@ -61,6 +62,7 @@ function sizeOrder(
     riskPercent: config.riskPercent,
     sizingMode: config.sizingMode ?? 'risk_percent',
     fixedPositionUsdt: config.fixedPositionUsdt ?? 100,
+    leverage,
   });
 }
 
@@ -92,7 +94,7 @@ export async function openFromSignal(signal: StrategySignal, inst: StrategyInsta
 
   const { sl, tp } = defaultStops(signal);
   const equity = mode === 'paper' ? paperBroker.equity() : await getAccountEquity();
-  const { positionSize, qty } = sizeOrder(equity, inst, signal, sl);
+  const { positionSize, qty, leverage } = sizeOrder(equity, inst, signal, sl);
 
   if (mode === 'paper') {
     const trade = paperBroker.openMarket({
@@ -103,6 +105,7 @@ export async function openFromSignal(signal: StrategySignal, inst: StrategyInsta
       takeProfit: tp,
       qty,
       positionSize,
+      leverage,
       riskPercent: config.riskPercent,
       strategyInstanceId: inst.id,
       strategyType: inst.strategyType,
@@ -137,6 +140,7 @@ export async function openFromSignal(signal: StrategySignal, inst: StrategyInsta
     riskDistance: Math.abs(signal.price - sl),
     riskPercent: config.riskPercent,
     positionSize,
+    leverage,
     qty,
     openedAt: Date.now(),
     status: 'open',

@@ -144,6 +144,11 @@ const canRun = computed(() => selectedSymbols.value.length > 0 && !!selectedInst
 function formatParamKey(key: string): string {
   return key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())
 }
+
+function formatParamValue(key: string, val: unknown): string {
+  if (key === 'leverage' && val != null && val !== '') return `${val}×`
+  return String(val)
+}
 </script>
 
 <template>
@@ -184,7 +189,7 @@ function formatParamKey(key: string): string {
                   class="bg-base-300 rounded px-2 py-1"
                 >
                   <div class="text-xs text-base-content/50">{{ formatParamKey(key) }}</div>
-                  <div class="text-sm font-mono font-semibold">{{ val }}</div>
+                  <div class="text-sm font-mono font-semibold">{{ formatParamValue(key, val) }}</div>
                 </div>
               </div>
               <p class="text-xs text-base-content/40 italic">

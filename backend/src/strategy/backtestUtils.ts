@@ -4,7 +4,7 @@ import { IStrategy, BacktestStrategyParams, StrategyBacktestResult } from './ISt
 import { fetchCandlesRange } from '../bybit/client';
 import { logger } from '../logger';
 import { loadConfig } from '../config';
-import { sizePosition } from './riskManager';
+import { resolveLeverage, sizePosition } from './riskManager';
 
 export function calcSummary(trades: Trade[], startEquity: number, endEquity: number): BacktestSummary {
   const winners = trades.filter(t => (t.pnl ?? 0) > 0);
@@ -46,6 +46,7 @@ export function makeBacktestTrade(partial: {
   takeProfit: number;
   riskPercent: number;
   positionSize: number;
+  leverage?: number;
   qty: number;
   openedAt: number;
   closedAt: number;
@@ -66,6 +67,7 @@ export function makeBacktestTrade(partial: {
     riskDistance: Math.abs(partial.entryPrice - partial.stopLoss),
     riskPercent: partial.riskPercent,
     positionSize: partial.positionSize,
+    leverage: partial.leverage,
     qty: partial.qty,
     openedAt: partial.openedAt,
     closedAt: partial.closedAt,
@@ -106,6 +108,10 @@ export async function runSignalBacktest(opts: {
     low: number,
   ): void {
     const cfg = loadConfig();
+    const leverage = resolveLeverage(
+      opts.params.params as Record<string, unknown>,
+      (opts.params as { leverage?: number }).leverage ?? cfg.leverage,
+    );
     const { positionSize: posSize, qty } = sizePosition({
       equity,
       entryPrice,
@@ -113,6 +119,7 @@ export async function runSignalBacktest(opts: {
       riskPercent: opts.params.riskPercent,
       sizingMode: cfg.sizingMode ?? 'risk_percent',
       fixedPositionUsdt: cfg.fixedPositionUsdt ?? 100,
+      leverage,
     });
     const pnlFactor = entryDir === 'bullish' ? 1 : -1;
     const pnl = ((exitPrice - entryPrice) / entryPrice) * posSize * pnlFactor;
@@ -125,6 +132,7 @@ export async function runSignalBacktest(opts: {
       takeProfit: tp,
       riskPercent: opts.params.riskPercent,
       positionSize: posSize,
+      leverage,
       qty,
       openedAt: entryTime,
       closedAt,

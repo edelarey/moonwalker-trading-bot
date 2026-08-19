@@ -20,6 +20,7 @@ const DEFAULT_CONFIG: AppConfig = {
   riskPercent: 1,
   sizingMode: 'risk_percent',
   fixedPositionUsdt: 100,
+  leverage: 1,
   tpMultiplier: 2.5,
   liquidityWindowStart: '00:00',
   liquidityWindowEnd: '04:00',
