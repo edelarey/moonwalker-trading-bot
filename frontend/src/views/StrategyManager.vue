@@ -37,6 +37,8 @@ const typeBadgeClass: Record<StrategyType, string> = {
   donchian: 'badge-primary',
   ema_pullback: 'badge-info',
   supertrend: 'badge-accent',
+  adx_di: 'badge-info',
+  keltner: 'badge-success',
   vwap: 'badge-secondary',
   orb: 'badge-warning',
   funding_arb: 'badge-accent',
@@ -618,6 +620,40 @@ const displaySignals = computed(() => store.signals.slice(0, 20))
                   <TimeframeSelect v-model="formParams.timeframe" />
                 </label>
               </div>
+            </template>
+
+            <template v-if="formType === 'adx_di'">
+              <div class="grid grid-cols-2 gap-2">
+                <label class="form-control"><span class="label-text text-xs">ADX period</span><input type="number" v-model.number="formParams.adxPeriod" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Min ADX</span><input type="number" v-model.number="formParams.adxMin" class="input input-bordered input-xs" step="1" /></label>
+                <label class="form-control"><span class="label-text text-xs">ATR period</span><input type="number" v-model.number="formParams.atrPeriod" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">SL ATR mult</span><input type="number" v-model.number="formParams.atrMultiplier" class="input input-bordered input-xs" step="0.1" /></label>
+                <label class="form-control"><span class="label-text text-xs">TP ATR mult</span><input type="number" v-model.number="formParams.takeProfitAtrMultiplier" class="input input-bordered input-xs" step="0.1" /></label>
+                <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
+                  <TimeframeSelect v-model="formParams.timeframe" />
+                </label>
+              </div>
+              <p class="text-xs text-base-content/50">Only trades when ADX ≥ min. Direction is +DI / −DI cross. Stops are ATR multiples, not a %.</p>
+            </template>
+
+            <template v-if="formType === 'keltner'">
+              <div class="grid grid-cols-2 gap-2">
+                <label class="form-control"><span class="label-text text-xs">EMA period</span><input type="number" v-model.number="formParams.emaPeriod" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">ATR period</span><input type="number" v-model.number="formParams.atrPeriod" class="input input-bordered input-xs" /></label>
+                <label class="form-control"><span class="label-text text-xs">Band ATR mult</span><input type="number" v-model.number="formParams.multiplier" class="input input-bordered input-xs" step="0.1" /></label>
+                <label class="form-control"><span class="label-text text-xs">Mode</span>
+                  <select v-model="formParams.mode" class="select select-bordered select-readable w-full">
+                    <option value="breakout">Breakout</option>
+                    <option value="mean_reversion">Mean reversion</option>
+                  </select>
+                </label>
+                <label class="form-control"><span class="label-text text-xs">SL ATR mult</span><input type="number" v-model.number="formParams.atrStopMultiplier" class="input input-bordered input-xs" step="0.1" /></label>
+                <label class="form-control"><span class="label-text text-xs">TP ATR mult</span><input type="number" v-model.number="formParams.takeProfitAtrMultiplier" class="input input-bordered input-xs" step="0.1" /></label>
+                <label class="form-control col-span-2"><span class="label-text text-xs">Timeframe</span>
+                  <TimeframeSelect v-model="formParams.timeframe" />
+                </label>
+              </div>
+              <p class="text-xs text-base-content/50">Breakout: close outside the ATR envelope. Mean reversion: fade the band, target the EMA. TP ATR is unused in mean-reversion (target is the midline).</p>
             </template>
 
             <template v-if="formType === 'vwap'">

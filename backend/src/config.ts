@@ -70,6 +70,13 @@ const DEFAULT_CONFIG: AppConfig = {
       fastPeriod: 9, slowPeriod: 21, timeframe: '15', stopLossPercent: 2, takeProfitPercent: 4,
     },
     supertrend: { atrPeriod: 10, multiplier: 2, timeframe: '15' },
+    adx_di: {
+      adxPeriod: 14, adxMin: 25, atrPeriod: 14, atrMultiplier: 2, takeProfitAtrMultiplier: 3, timeframe: '60',
+    },
+    keltner: {
+      emaPeriod: 20, atrPeriod: 10, multiplier: 1.5, mode: 'breakout',
+      atrStopMultiplier: 2, takeProfitAtrMultiplier: 3, timeframe: '60',
+    },
     vwap: {
       timeframe: '5', deviationPercent: 0.6, stopLossPercent: 1.2, takeProfitPercent: 0.8, sessionResetHour: 0,
     },

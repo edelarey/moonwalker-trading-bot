@@ -49,6 +49,66 @@ export function atr(candles: Candle[], period: number): number | null {
   return sum / period;
 }
 
+export interface AdxSnapshot {
+  adx: number;
+  plusDI: number;
+  minusDI: number;
+}
+
+/**
+ * Wilder ADX / +DI / −DI. Needs about 2×period+1 bars after the first TR.
+ */
+export function adx(candles: Candle[], period: number): AdxSnapshot | null {
+  if (period < 2 || candles.length < period * 2 + 2) return null;
+  const plusDM: number[] = [];
+  const minusDM: number[] = [];
+  const tr: number[] = [];
+  for (let i = 1; i < candles.length; i++) {
+    const up = candles[i].high - candles[i - 1].high;
+    const down = candles[i - 1].low - candles[i].low;
+    plusDM.push(up > down && up > 0 ? up : 0);
+    minusDM.push(down > up && down > 0 ? down : 0);
+    tr.push(trueRange(candles[i], candles[i - 1].close));
+  }
+  if (tr.length < period * 2) return null;
+
+  let smTR = 0;
+  let smP = 0;
+  let smM = 0;
+  for (let i = 0; i < period; i++) {
+    smTR += tr[i];
+    smP += plusDM[i];
+    smM += minusDM[i];
+  }
+
+  const dx: number[] = [];
+  let plusDI = 0;
+  let minusDI = 0;
+  const pushDx = (): void => {
+    plusDI = smTR > 0 ? (100 * smP) / smTR : 0;
+    minusDI = smTR > 0 ? (100 * smM) / smTR : 0;
+    const denom = plusDI + minusDI;
+    dx.push(denom > 0 ? (100 * Math.abs(plusDI - minusDI)) / denom : 0);
+  };
+  pushDx();
+
+  for (let i = period; i < tr.length; i++) {
+    smTR = smTR - smTR / period + tr[i];
+    smP = smP - smP / period + plusDM[i];
+    smM = smM - smM / period + minusDM[i];
+    pushDx();
+  }
+  if (dx.length < period) return null;
+
+  let adxVal = 0;
+  for (let i = 0; i < period; i++) adxVal += dx[i];
+  adxVal /= period;
+  for (let i = period; i < dx.length; i++) {
+    adxVal = (adxVal * (period - 1) + dx[i]) / period;
+  }
+  return { adx: adxVal, plusDI, minusDI };
+}
+
 export function highest(values: number[], period: number, excludeLast = false): number | null {
   const end = excludeLast ? values.length - 1 : values.length;
   const start = end - period;

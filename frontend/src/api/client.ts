@@ -19,6 +19,8 @@ export type StrategyType =
   | 'donchian'
   | 'ema_pullback'
   | 'supertrend'
+  | 'adx_di'
+  | 'keltner'
   | 'vwap'
   | 'orb'
   | 'funding_arb'
@@ -28,7 +30,7 @@ export type StrategyType =
 
 export const ALL_STRATEGY_TYPES: StrategyType[] = [
   'break_bounce', 'dca', 'grid', 'ma_crossover', 'rsi', 'bollinger',
-  'donchian', 'ema_pullback', 'supertrend', 'vwap', 'orb',
+  'donchian', 'ema_pullback', 'supertrend', 'adx_di', 'keltner', 'vwap', 'orb',
   'funding_arb', 'cross_exchange', 'dynamic_delta', 'drawdown_hedge',
 ]
 
@@ -42,6 +44,8 @@ export const STRATEGY_TYPE_NAMES: Record<StrategyType, string> = {
   donchian: 'Donchian Breakout',
   ema_pullback: 'EMA Pullback',
   supertrend: 'Supertrend',
+  adx_di: 'ADX + DI',
+  keltner: 'Keltner Channel',
   vwap: 'VWAP Fade',
   orb: 'Opening Range Breakout',
   funding_arb: 'Funding Arb (delta-neutral)',

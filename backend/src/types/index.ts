@@ -230,6 +230,8 @@ export type StrategyType =
   | 'donchian'
   | 'ema_pullback'
   | 'supertrend'
+  | 'adx_di'
+  | 'keltner'
   | 'vwap'
   | 'orb'
   | 'funding_arb'
@@ -249,6 +251,8 @@ export const ALL_STRATEGY_TYPES: StrategyType[] = [
   'donchian',
   'ema_pullback',
   'supertrend',
+  'adx_di',
+  'keltner',
   'vwap',
   'orb',
   'funding_arb',
@@ -370,6 +374,29 @@ export interface SupertrendParams {
   [key: string]: unknown;
   atrPeriod: number;
   multiplier: number;
+  timeframe: string;
+}
+
+/** ADX filter + +DI/−DI cross; ATR stop/target. */
+export interface AdxDiParams {
+  [key: string]: unknown;
+  adxPeriod: number;
+  adxMin: number;
+  atrPeriod: number;
+  atrMultiplier: number;
+  takeProfitAtrMultiplier: number;
+  timeframe: string;
+}
+
+/** EMA ± ATR channel. */
+export interface KeltnerParams {
+  [key: string]: unknown;
+  emaPeriod: number;
+  atrPeriod: number;
+  multiplier: number;
+  mode: 'breakout' | 'mean_reversion';
+  atrStopMultiplier: number;
+  takeProfitAtrMultiplier: number;
   timeframe: string;
 }
 

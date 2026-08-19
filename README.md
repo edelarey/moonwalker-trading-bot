@@ -37,6 +37,8 @@ Paper and live both open/close Bybit perps (live needs keys + `LIVE`).
 | `ema_pullback` | 9/21 trend, enter on a tap of the fast EMA | 15m, 2% SL / 4% TP |
 | `supertrend` | ATR trailing band; trade flips | ATR 10 × 2 on 15m |
 | `donchian` | 20-bar channel breakout, ATR stops | 4h, SL 2.5 ATR, TP 4 ATR |
+| `adx_di` | +DI/−DI cross only when ADX ≥ min; ATR stops | 1h, ADX 14 ≥ 25, SL 2 ATR, TP 3 ATR |
+| `keltner` | EMA ± ATR envelope (breakout or fade) | 1h, EMA 20 ± 1.5 ATR(10), SL 2 ATR, TP 3 ATR |
 | `vwap` | Fade extensions from UTC-session VWAP | 5m, 0.6% band |
 | `orb` | First N minutes of UTC day set the range | 30m range, 2R, 1 trade/day |
 | `rsi` | Extreme mean-reversion | 14 / 20 / 80, 2 confirm candles, 1h |

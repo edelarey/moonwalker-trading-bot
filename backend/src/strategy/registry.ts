@@ -16,6 +16,8 @@ import { GridStrategy } from './strategies/GridStrategy';
 import { DonchianStrategy } from './strategies/DonchianStrategy';
 import { EmaPullbackStrategy } from './strategies/EmaPullbackStrategy';
 import { SupertrendStrategy } from './strategies/SupertrendStrategy';
+import { AdxDiStrategy } from './strategies/AdxDiStrategy';
+import { KeltnerStrategy } from './strategies/KeltnerStrategy';
 import { VwapStrategy } from './strategies/VwapStrategy';
 import { OrbStrategy } from './strategies/OrbStrategy';
 import { BreakBounceStrategy } from './strategies/BreakBounceStrategy';
@@ -40,6 +42,8 @@ export class StrategyRegistry extends EventEmitter {
       case 'donchian': return new DonchianStrategy(inst);
       case 'ema_pullback': return new EmaPullbackStrategy(inst);
       case 'supertrend': return new SupertrendStrategy(inst);
+      case 'adx_di': return new AdxDiStrategy(inst);
+      case 'keltner': return new KeltnerStrategy(inst);
       case 'vwap': return new VwapStrategy(inst);
       case 'orb': return new OrbStrategy(inst);
       case 'funding_arb': return new FundingArbStrategy(inst);

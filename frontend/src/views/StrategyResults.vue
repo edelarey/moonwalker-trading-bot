@@ -30,6 +30,8 @@ const typeBadgeClass: Record<string, string> = {
   donchian: 'badge-primary',
   ema_pullback: 'badge-info',
   supertrend: 'badge-accent',
+  adx_di: 'badge-info',
+  keltner: 'badge-success',
   vwap: 'badge-secondary',
   orb: 'badge-warning',
   funding_arb: 'badge-accent',
